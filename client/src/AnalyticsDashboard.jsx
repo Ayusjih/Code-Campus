@@ -1,9 +1,13 @@
+
 // client/src/components/AnalyticsDashboard.jsx
 import React, { useState, useEffect } from 'react';
 import {
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
+
+// API base URL
+const API_BASE = import.meta.env.VITE_API_URL || 'https://code-campus-2-r20j.onrender.com';
 
 const AnalyticsDashboard = ({ user }) => {
   const [analyticsData, setAnalyticsData] = useState(null);
@@ -18,8 +22,8 @@ const AnalyticsDashboard = ({ user }) => {
         
         // Fetch user analytics and comparison data simultaneously
         const [analyticsResponse, comparisonResponse] = await Promise.all([
-          fetch(`http://localhost:5000/api/analytics/user/${user.email}`),
-          fetch(`http://localhost:5000/api/analytics/comparison/${user.email}`)
+          fetch(`${API_BASE}/api/analytics/user/${user.email}`),
+          fetch(`${API_BASE}/api/analytics/comparison/${user.email}`)
         ]);
 
         if (!analyticsResponse.ok || !comparisonResponse.ok) {

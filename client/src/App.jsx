@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import Dashboard from './Dashboard';
 import Leaderboard from './Leaderboard';
@@ -12,8 +13,8 @@ import DeveloperLogin from './DeveloperLogin';
 import DeveloperDashboard from './DeveloperDashboard';
 import ProfileDashboard from './ProfileDashboard';
 
-// API Base URL
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:5000';
+// API Base URL - UPDATED FOR RENDER
+const API_BASE = import.meta.env.VITE_API_URL || 'https://code-campus-2-r20j.onrender.com';
 
 // --- MAIN APP COMPONENT ---
 function App() {

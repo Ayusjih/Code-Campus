@@ -1,4 +1,8 @@
+
 import React, { useState, useEffect, useRef } from 'react';
+
+// API base URL
+const API_BASE = import.meta.env.VITE_API_URL || 'https://code-campus-2-r20j.onrender.com';
 
 // --- ROW COMPONENT (User Row Logic) ---
 const TableRow = ({ student, index, isSticky = false, rowRef = null, onInspect, currentUserEmail, getRatingColor }) => (
@@ -138,7 +142,7 @@ const Leaderboard = ({ onBack, onInspect }) => {
     const savedUser = JSON.parse(localStorage.getItem('codecampus_user'));
     if (savedUser) setCurrentUserEmail(savedUser.email);
 
-    fetch('http://localhost:5000/api/leaderboard')
+    fetch(`${API_BASE}/api/leaderboard`)
       .then(res => res.json())
       .then(data => {
         if (data.leaderboard) {

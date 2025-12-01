@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import AnalyticsDashboard from './AnalyticsDashboard';
 
@@ -14,6 +15,9 @@ const Dashboard = ({ user, onLogout, isReadOnly = false, onShowLeaderboard, onSh
     codechef_id: user.codechef_id || '',
     hackerrank_id: user.hackerrank_id || ''
   });
+
+  // API base URL
+  const API_BASE = import.meta.env.VITE_API_URL || 'https://code-campus-2-r20j.onrender.com';
 
   // --- ENHANCED CALCULATIONS ---
   const lcScore = (user.lc_easy * 10) + (user.lc_medium * 50) + (user.lc_hard * 100);
@@ -62,7 +66,7 @@ const Dashboard = ({ user, onLogout, isReadOnly = false, onShowLeaderboard, onSh
 
   // --- DATA FETCHING ---
   useEffect(() => {
-    fetch('http://localhost:5000/api/leaderboard')
+    fetch(`${API_BASE}/api/leaderboard`)
       .then(res => res.json())
       .then(data => {
         const leaderboardData = data.leaderboard || data;
@@ -87,7 +91,7 @@ const Dashboard = ({ user, onLogout, isReadOnly = false, onShowLeaderboard, onSh
   const handleUpdateProfile = async () => {
     if (isReadOnly) return;
     try {
-      const res = await fetch('http://localhost:5000/api/update-profile', {
+      const res = await fetch(`${API_BASE}/api/update-profile`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: user.email, ...formData })
@@ -110,7 +114,7 @@ const Dashboard = ({ user, onLogout, isReadOnly = false, onShowLeaderboard, onSh
     if (refreshing) return;
     setRefreshing(true);
     try {
-      const res = await fetch('http://localhost:5000/api/refresh-stats', {
+      const res = await fetch(`${API_BASE}/api/refresh-stats`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: user.email })
@@ -142,12 +146,6 @@ const Dashboard = ({ user, onLogout, isReadOnly = false, onShowLeaderboard, onSh
   };
 
   // Graph Components
-  {user && (
-  <div className="mt-8">
-    <h2 className="text-2xl font-bold text-gray-800 mb-6">Your Analytics & Progress</h2>
-    <AnalyticsDashboard user={user} />
-  </div>
-)}
   const WeeklyProgressGraph = () => (
     <div className="bg-white p-6 rounded-xl border border-gray-200">
       <div className="flex justify-between items-center mb-4">

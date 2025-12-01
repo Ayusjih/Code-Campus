@@ -1,5 +1,9 @@
+
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+
+// API base URL
+const API_BASE = import.meta.env.VITE_API_URL || 'https://code-campus-2-r20j.onrender.com';
 
 // UI Icons for the Dashboard
 const Icons = {
@@ -33,7 +37,7 @@ const DeveloperDashboard = () => {
         return;
       }
       
-      const response = await axios.get('http://localhost:5000/api/developer/data', {
+      const response = await axios.get(`${API_BASE}/api/developer/data`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setDeveloperData(response.data);
@@ -56,7 +60,7 @@ const DeveloperDashboard = () => {
         itemToSend = { text: newItem.text || newItem.description };
       }
 
-      await axios.post(`http://localhost:5000/api/developer/data/${section}`, itemToSend, {
+      await axios.post(`${API_BASE}/api/developer/data/${section}`, itemToSend, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
@@ -77,7 +81,7 @@ const DeveloperDashboard = () => {
 
     try {
       const token = localStorage.getItem('developerToken');
-      await axios.delete(`http://localhost:5000/api/developer/data/${section}/${index}`, {
+      await axios.delete(`${API_BASE}/api/developer/data/${section}/${index}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       

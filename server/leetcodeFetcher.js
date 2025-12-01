@@ -1,10 +1,9 @@
+// server/leetcodeFetcher.js
 const axios = require('axios');
 
 async function fetchLeetCodeStats(username) {
     try {
-        if (!username) return null;
-        
-        console.log(`🔍 Fetching LeetCode stats for: ${username}`);
+        // LeetCode ka Official GraphQL API Endpoint
         const response = await axios.post('https://leetcode.com/graphql', {
             query: `
                 query userProblemsSolved($username: String!) {
@@ -17,25 +16,27 @@ async function fetchLeetCodeStats(username) {
                 }
             `,
             variables: { username }
-        }, { timeout: 10000 });
+        });
 
         const data = response.data.data;
 
+        // Agar user nahi mila
         if (!data.matchedUser) {
             console.log(`❌ User ${username} not found on LeetCode`);
             return null;
         }
 
+        // Data extract karo
         const stats = data.matchedUser.submitStats.acSubmissionNum;
         
-        const easy = stats.find(s => s.difficulty === 'Easy')?.count || 0;
-        const medium = stats.find(s => s.difficulty === 'Medium')?.count || 0;
-        const hard = stats.find(s => s.difficulty === 'Hard')?.count || 0;
-        const total = stats.find(s => s.difficulty === 'All')?.count || 0;
+        // Stats format: [ { difficulty: 'All', count: 100 }, { difficulty: 'Easy', count: 50 } ... ]
+        const easy = stats.find(s => s.difficulty === 'Easy').count;
+        const medium = stats.find(s => s.difficulty === 'Medium').count;
+        const hard = stats.find(s => s.difficulty === 'Hard').count;
 
         console.log(`✅ ${username}: Easy=${easy}, Medium=${medium}, Hard=${hard}`);
 
-        return { easy, medium, hard, total };
+        return { easy, medium, hard };
 
     } catch (error) {
         console.error("❌ Error fetching LeetCode stats:", error.message);
@@ -43,4 +44,4 @@ async function fetchLeetCodeStats(username) {
     }
 }
 
-module.exports = fetchLeetCodeStats;
+module.exports = fetchLeetCodeStats; 

@@ -1,5 +1,9 @@
+
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+
+// API base URL
+const API_BASE = import.meta.env.VITE_API_URL || 'https://code-campus-2-r20j.onrender.com';
 
 // Simple Icons Components
 const Icons = {
@@ -71,7 +75,7 @@ const DeveloperPage = ({ currentUser }) => {
 
   const fetchDeveloperData = async () => {
     try {
-      const response = await axios.get('http://localhost:5000/api/developer/data');
+      const response = await axios.get(`${API_BASE}/api/developer/data`);
       setDeveloperData(response.data);
     } catch (error) {
       console.error('Error fetching developer data:', error);
@@ -135,7 +139,7 @@ const DeveloperPage = ({ currentUser }) => {
     e.preventDefault();
     setLoginError('');
     try {
-      const response = await axios.post('http://localhost:5000/api/developer/login', loginCredentials);
+      const response = await axios.post(`${API_BASE}/api/developer/login`, loginCredentials);
       if (response.data.token) {
         localStorage.setItem('developerToken', response.data.token);
         setIsDeveloper(true);
@@ -374,7 +378,7 @@ const DeveloperPage = ({ currentUser }) => {
                     <div className="w-16 h-16 rounded-full bg-gray-100 overflow-hidden flex-shrink-0 border-2 border-white shadow-md">
                        <img src={`https://ui-avatars.com/api/?name=${guide.source}&background=f3f4f6&color=374151`} alt={guide.source} className="w-full h-full object-cover" />
                     </div>
-                    <div className="flex-1">
+                    <div>
                        <h4 className="font-bold text-lg text-gray-900">{guide.source}</h4>
                        <p className="text-sm font-medium text-gray-600">{guide.description}</p>
                        <div className="flex flex-wrap items-center gap-2 mt-2">

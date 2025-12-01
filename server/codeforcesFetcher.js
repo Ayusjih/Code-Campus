@@ -2,38 +2,24 @@ const axios = require('axios');
 
 async function fetchCodeforcesStats(username) {
     try {
-        if (!username) return null;
+        // Official API (No key required)
+        const url = `https://codeforces.com/api/user.info?handles=${username}`;
+        const response = await axios.get(url);
         
-        console.log(`🔍 Fetching Codeforces stats for: ${username}`);
-        const infoUrl = `https://codeforces.com/api/user.info?handles=${username}`;
-        const statusUrl = `https://codeforces.com/api/user.status?handle=${username}`;
+        const data = response.data;
 
-        const [infoRes, statusRes] = await Promise.all([
-            axios.get(infoUrl, { timeout: 10000 }),
-            axios.get(statusUrl, { timeout: 15000 })
-        ]);
+        if (data.status === 'OK' && data.result.length > 0) {
+            const user = data.result[0];
+            // Agar rating abhi nahi mili (unrated), toh 0 maano
+            const rating = user.rating || 0;
+            const rank = user.rank || 'unrated';
 
-        if (infoRes.data.status === 'OK' && statusRes.data.status === 'OK') {
-            const user = infoRes.data.result[0];
-            const submissions = statusRes.data.result;
-            
-            const solvedSet = new Set();
-            submissions.forEach(sub => {
-                if (sub.verdict === 'OK') {
-                    solvedSet.add(`${sub.problem.contestId}${sub.problem.index}`);
-                }
-            });
-
-            return { 
-                rating: user.rating || 0, 
-                maxRating: user.maxRating || 0,
-                rank: user.rank || 'unrated',
-                 solved: userData.solvedCount || 0
-            };
+            console.log(`✅ Codeforces ${username}: Rating=${rating}, Rank=${rank}`);
+            return { rating, rank };
         }
         return null;
     } catch (error) {
-        console.error(`❌ Error fetching Codeforces for ${username}:`, error.message);
+        console.error(`❌ Codeforces Error for ${username}: User not found or API down.`);
         return null;
     }
 }

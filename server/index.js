@@ -1,936 +1,581 @@
 const express = require('express');
 const cors = require('cors');
-const bcrypt = require('bcryptjs');
 const pool = require('./db');
 const fetchLeetCodeStats = require('./leetcodeFetcher');
 const fetchHackerRankStats = require('./hackerrankFetcher');
 const fetchCodeforcesStats = require('./codeforcesFetcher');
 const fetchCodeChefStats = require('./codechefFetcher');
 const cron = require('node-cron');
-const nodemailer = require('nodemailer'); // ✅ IMPORT NODEMAILER
+const nodemailer = require('nodemailer');
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// ✅ MIDDLEWARE SETUP FIRST
-app.use(cors());
+// CORS configuration
+app.use(cors({
+  origin: ['https://code-campus-2-r20j.onrender.com', 'http://localhost:5173'],
+  credentials: true
+}));
 app.use(express.json());
 
-// ✅ DEBUG MIDDLEWARE
-app.use((req, res, next) => {
-    console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
-    if (req.body && Object.keys(req.body).length > 0) {
-        console.log('📦 Request body:', JSON.stringify(req.body, null, 2));
-    }
-    next();
-});
-
-// ✅ ROUTES
-const statsRoutes = require('./routes/statsAPI');
-app.use('/api/stats', statsRoutes);
-app.use('/api/developer', require('./routes/developer'));
-
-// -------------------------------------------------------------------------
-// 📧 EMAIL OTP CONFIGURATION (NODEMAILER)
-// -------------------------------------------------------------------------
-
-// 👇👇👇 CHANGE PERSONAL DETAILS HERE (Line 43-46) 👇👇👇
+// --- EMAIL TRANSPORTER SETUP ---
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
-    user: 'codecampus.0923@gmail.com',
-
-    pass: 'soux udsk gfhs szyc'        // 2. REPLACE with your 16-char App Password
+    user: process.env.EMAIL_USER || 'your-email@gmail.com',
+    pass: process.env.EMAIL_PASS || 'your-app-password'
   }
 });
 
-// Temporary OTP Store (In production, consider Redis)
+// Test email connection
+transporter.verify((error, success) => {
+  if (error) {
+    console.error('❌ Email server connection failed:', error);
+  } else {
+    console.log('✅ Email server is ready to send messages');
+  }
+});
+
+// --- OTP STORAGE (Temporary - use database in production) ---
 const otpStore = new Map();
 
-// --- OTP ROUTE 1: SEND CODE ---
-app.post('/api/send-otp', async (req, res) => {
-  const { email } = req.body;
-  if (!email) return res.status(400).json({ message: "Email required" });
-
-  // Generate 6 digit OTP
-  const otp = Math.floor(100000 + Math.random() * 900000).toString();
-  
-  // Store OTP (Expires in 10 minutes)
-  otpStore.set(email, { otp, expires: Date.now() + 10 * 60 * 1000 });
-
-  const mailOptions = {
-    from: '"CodeCampus Security" <your-email@gmail.com>', // Sender address
-    to: email,
-    subject: 'Verify Your Email - CodeCampus',
-    html: `
-      <div style="font-family: sans-serif; padding: 20px; text-align: center; border: 1px solid #ddd; border-radius: 10px; max-width: 500px; margin: auto;">
-        <h2 style="color: #4F46E5;">CodeCampus Verification</h2>
-        <p>Use the code below to complete your registration:</p>
-        <h1 style="background: #f3f4f6; display: inline-block; padding: 10px 20px; letter-spacing: 5px; border-radius: 8px; color: #333;">${otp}</h1>
-        <p style="color: #666; font-size: 12px; margin-top: 20px;">This code expires in 10 minutes.</p>
-      </div>
-    `
-  };
-
-  try {
-    await transporter.sendMail(mailOptions);
-    console.log(`📧 OTP sent to ${email}`);
-    res.json({ success: true, message: "OTP sent successfully" });
-  } catch (error) {
-    console.error("❌ Email error:", error);
-    res.status(500).json({ success: false, message: "Failed to send email. Check server logs." });
-  }
-});
-
-// --- OTP ROUTE 2: VERIFY CODE ---
-app.post('/api/verify-otp', (req, res) => {
-  const { email, otp } = req.body;
-  const record = otpStore.get(email);
-
-  if (!record) return res.status(400).json({ success: false, message: "No OTP found. Please resend." });
-  
-  if (Date.now() > record.expires) {
-    otpStore.delete(email);
-    return res.status(400).json({ success: false, message: "OTP has expired." });
-  }
-
-  if (record.otp === otp) {
-    otpStore.delete(email); // OTP is single-use
-    return res.json({ success: true, message: "Verified" });
-  } else {
-    return res.status(400).json({ success: false, message: "Invalid OTP." });
-  }
-});
-
-// -------------------------------------------------------------------------
-// 🛠️ EXISTING LOGIC BELOW
-// -------------------------------------------------------------------------
-
-// --- MIDDLEWARE ---
-const validateEmail = (email) => {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-};
-
-const validateUserData = (req, res, next) => {
-    const { name, email, password, branch, semester, year, roll_number } = req.body;
-    
-    if (!name || !email || !password || !branch || !semester || !year || !roll_number) {
-        return res.status(400).json({ message: "All fields are required" });
-    }
-    
-    if (!validateEmail(email)) {
-        return res.status(400).json({ message: "Invalid email format" });
-    }
-    
-    if (password.length < 6) {
-        return res.status(400).json({ message: "Password must be at least 6 characters" });
-    }
-    
-    if (roll_number.length < 3) {
-        return res.status(400).json({ message: "Roll number must be at least 3 characters" });
-    }
-    
-    next();
-};
-
-// --- SCORE CALCULATION ---
+// --- HELPER: SCORE FORMULA ---
 const RECALCULATE_SCORE_QUERY = `
     UPDATE users 
-    SET 
-        total_score = 
-            (COALESCE(lc_easy, 0) * 10) + 
-            (COALESCE(lc_medium, 0) * 50) + 
-            (COALESCE(lc_hard, 0) * 100) + 
-            (COALESCE(cf_rating, 0) * 1) + 
-            (COALESCE(cc_rating, 0) * 1) + 
-            (COALESCE(hackerrank_score, 0) * 0.5) + 
-            (COALESCE(college_contest_points, 0)),
-        
-        weekly_solved_count = (
-            (COALESCE(lc_easy, 0) + COALESCE(lc_medium, 0) + COALESCE(lc_hard, 0)) - COALESCE(total_solved_snapshot, 0)
-        )
+    SET total_score = 
+        (COALESCE(lc_easy, 0) * 10) + 
+        (COALESCE(lc_medium, 0) * 50) + 
+        (COALESCE(lc_hard, 0) * 100) + 
+        (COALESCE(cf_rating, 0) * 1) + 
+        (COALESCE(cc_rating, 0) * 1) + 
+        (COALESCE(hackerrank_score, 0) * 0.5) + 
+        (COALESCE(college_contest_points, 0))
     WHERE email = $1
     RETURNING *
 `;
 
-// Helper function to calculate progress metrics
-async function calculateProgressMetrics(email) {
+// --- ROUTES ---
+
+app.get('/', (req, res) => res.send('CodeCampus Server Running...'));
+
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'healthy', timestamp: new Date().toISOString() });
+});
+
+// 1. SEND OTP FOR REGISTRATION
+app.post('/api/send-otp', async (req, res) => {
   try {
-    const userResult = await pool.query(
-      `SELECT lc_easy, lc_medium, lc_hard, cf_solved, cc_solved, hr_solved, created_at 
-       FROM users WHERE email = $1`,
+    const { email, name = '' } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Email is required' 
+      });
+    }
+
+    // Check if email already registered
+    const userCheck = await pool.query(
+      "SELECT email FROM users WHERE email = $1", 
       [email]
     );
     
-    if (userResult.rows.length === 0) return [];
-    
-    const user = userResult.rows[0];
-    const totalSolved = (user.lc_easy || 0) + (user.lc_medium || 0) + (user.lc_hard || 0) + 
-                       (user.cf_solved || 0) + (user.cc_solved || 0) + (user.hr_solved || 0);
-    
-    const joinDate = new Date(user.created_at);
-    const monthsDiff = Math.floor((new Date() - joinDate) / (30 * 24 * 60 * 60 * 1000));
-    
-    const progressData = [];
-    for (let i = 0; i <= Math.min(monthsDiff, 6); i++) {
-      const date = new Date(joinDate);
-      date.setMonth(joinDate.getMonth() + i);
-      
-      const progressFactor = (i + 1) / (monthsDiff + 1);
-      const monthlySolved = Math.floor(totalSolved * progressFactor * (0.2 + Math.random() * 0.3));
-      
-      progressData.push({
-        date: date.toISOString().slice(0, 7),
-        problemsSolved: monthlySolved,
-        cumulativeSolved: Math.floor(totalSolved * progressFactor)
+    if (userCheck.rows.length > 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Email already registered. Please login instead.' 
       });
     }
+
+    // Generate 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
     
-    return progressData;
-  } catch (error) {
-    console.error('Progress metrics error:', error);
-    return [];
-  }
-}
+    // Store OTP with expiration (10 minutes)
+    otpStore.set(email, {
+      otp,
+      timestamp: Date.now(),
+      attempts: 0,
+      name: name
+    });
 
-// Helper function to calculate skill distribution
-function calculateSkillDistribution(user) {
-  const skills = [];
-  
-  if ((user.lc_easy || 0) > 0) {
-    skills.push({ name: 'Basic Problems', value: user.lc_easy, color: '#10B981' });
-  }
-  
-  if ((user.lc_medium || 0) > 0) {
-    skills.push({ name: 'Intermediate Problems', value: user.lc_medium, color: '#F59E0B' });
-  }
-  
-  if ((user.lc_hard || 0) > 0) {
-    skills.push({ name: 'Advanced Problems', value: user.lc_hard, color: '#EF4444' });
-  }
-  
-  if ((user.cf_rating || 0) > 0) {
-    skills.push({ name: 'Competitive Rating', value: Math.floor(user.cf_rating / 10), color: '#3B82F6' });
-  }
-  
-  return skills;
-}
+    // Email HTML template
+    const mailOptions = {
+      from: '"Code Campus - ITM Gwalior" <noreply@codecampus.com>',
+      to: email,
+      subject: '🔐 Your OTP for Code Campus Registration',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
+          <div style="text-align: center; margin-bottom: 30px;">
+            <h1 style="color: #4F46E5; margin: 0;">Code Campus</h1>
+            <p style="color: #666; margin: 5px 0;">ITM Gwalior</p>
+          </div>
+          
+          <h2 style="color: #333;">Hello ${name || 'there'},</h2>
+          <p>Your One-Time Password (OTP) for registration is:</p>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <div style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                        color: white; font-size: 32px; font-weight: bold; letter-spacing: 10px; 
+                        padding: 20px 40px; border-radius: 10px; box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);">
+              ${otp}
+            </div>
+          </div>
+          
+          <p style="color: #666; font-size: 14px;">
+            ⏰ This OTP is valid for <strong>10 minutes</strong>.<br>
+            🔒 Do not share this OTP with anyone.<br>
+            🚀 Enter this code in the registration form to verify your email.
+          </p>
+          
+          <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; text-align: center;">
+            <p style="color: #999; font-size: 12px; margin: 5px 0;">
+              If you didn't request this OTP, please ignore this email.
+            </p>
+            <p style="color: #999; font-size: 12px; margin: 5px 0;">
+              © ${new Date().getFullYear()} Code Campus - ITM Gwalior. All rights reserved.
+            </p>
+          </div>
+        </div>
+      `
+    };
 
-// Helper function to calculate percentile
-function calculatePercentile(userValue, average) {
-  if (!average || average === 0) return 50;
-  const ratio = userValue / average;
-  if (ratio >= 2) return 95;
-  if (ratio >= 1.5) return 85;
-  if (ratio >= 1.2) return 75;
-  if (ratio >= 1) return 60;
-  if (ratio >= 0.8) return 40;
-  if (ratio >= 0.6) return 25;
-  return 15;
-}
+    // Send email
+    await transporter.sendMail(mailOptions);
+    
+    console.log(`📧 OTP sent to ${email}: ${otp}`);
+    
+    res.json({ 
+      success: true, 
+      message: 'OTP sent successfully! Check your email.',
+      email: email
+    });
 
-// --- ROUTES ---
+  } catch (err) {
+    console.error('❌ OTP sending error:', err);
+    
+    // Fallback to console OTP for development
+    if (process.env.NODE_ENV === 'development') {
+      const otp = Math.floor(100000 + Math.random() * 900000).toString();
+      const { email } = req.body;
+      
+      if (email) {
+        otpStore.set(email, {
+          otp,
+          timestamp: Date.now(),
+          attempts: 0,
+          name: req.body.name || ''
+        });
+        
+        console.log(`🛠️ DEVELOPMENT MODE - OTP for ${email}: ${otp}`);
+        
+        return res.json({ 
+          success: true, 
+          message: 'OTP sent (development mode)',
+          email: email,
+          development_otp: otp
+        });
+      }
+    }
+    
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to send OTP. Please try again later.' 
+    });
+  }
+});
 
-app.get('/', (req, res) => res.json({ 
-    message: 'CodeCampus Server Running 🚀',
-    version: '1.0.0',
-    endpoints: [
-        '/api/register', 
-        '/api/login', 
-        '/api/leaderboard', 
-        '/api/leaderboard/top10',
-        '/api/refresh-stats', 
-        '/api/metrics',
-        '/api/stats/overall',
-        '/api/stats/platforms',
-        '/api/analytics/user/:email',
-        '/api/analytics/comparison/:email'
-    ]
-}));
+// 2. VERIFY OTP
+app.post('/api/verify-otp', async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+    
+    if (!email || !otp) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Email and OTP are required' 
+      });
+    }
 
-// 1. REGISTER
-app.post('/api/register', validateUserData, async (req, res) => {
+    const storedData = otpStore.get(email);
+    
+    if (!storedData) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'OTP expired or not found. Please request a new one.' 
+      });
+    }
+
+    // Check if OTP expired (10 minutes)
+    const isExpired = (Date.now() - storedData.timestamp) > 10 * 60 * 1000;
+    
+    if (isExpired) {
+      otpStore.delete(email);
+      return res.status(400).json({ 
+        success: false, 
+        message: 'OTP expired. Please request a new one.' 
+      });
+    }
+
+    // Check OTP attempts
+    if (storedData.attempts >= 3) {
+      otpStore.delete(email);
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Too many failed attempts. Please request a new OTP.' 
+      });
+    }
+
+    // Verify OTP
+    if (storedData.otp !== otp) {
+      storedData.attempts += 1;
+      otpStore.set(email, storedData);
+      
+      return res.status(400).json({ 
+        success: false, 
+        message: `Invalid OTP. ${3 - storedData.attempts} attempts remaining.` 
+      });
+    }
+
+    // OTP verified successfully
+    otpStore.delete(email);
+    
+    res.json({ 
+      success: true, 
+      message: 'Email verified successfully!',
+      verified: true 
+    });
+
+  } catch (err) {
+    console.error('❌ OTP verification error:', err);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to verify OTP' 
+    });
+  }
+});
+
+// 3. REGISTER USER (after OTP verification)
+app.post('/api/register', async (req, res) => {
     try {
-        const { name, email, password, branch, semester, year, roll_number, leetcode_id, codeforces_id, codechef_id, hackerrank_id } = req.body;
+        const { name, email, password, branch, semester, year, leetcode_id, codeforces_id, codechef_id, hackerrank_id, enrollment } = req.body;
         
-        console.log('📝 Registration attempt:', { name, email, roll_number });
-
-        const userCheck = await pool.query(
-            "SELECT * FROM users WHERE email = $1 OR roll_number = $2", 
-            [email, roll_number]
-        );
-        
-        if (userCheck.rows.length > 0) {
-            const existing = userCheck.rows[0];
-            if (existing.email === email) {
-                return res.status(409).json({ message: "User already exists with this email!" });
-            }
-            if (existing.roll_number === roll_number) {
-                return res.status(409).json({ message: "User already exists with this roll number!" });
-            }
+        // Validate required fields
+        if (!name || !email || !password || !branch || !semester || !year || !enrollment) {
+          return res.status(400).json({ 
+            message: "All required fields must be filled" 
+          });
         }
 
-        const hashedPassword = await bcrypt.hash(password, 12);
-        console.log('🔐 Password hashed successfully');
+        const userCheck = await pool.query("SELECT * FROM users WHERE email = $1 OR enrollment = $2", [email, enrollment]);
+        if (userCheck.rows.length > 0) {
+          const existingUser = userCheck.rows[0];
+          if (existingUser.email === email) {
+            return res.status(401).json({ message: "Email already registered!" });
+          }
+          if (existingUser.enrollment === enrollment) {
+            return res.status(401).json({ message: "Enrollment number already registered!" });
+          }
+        }
 
+        // Insert user into database
         await pool.query(
-            `INSERT INTO users (name, email, password, branch, semester, year, roll_number, leetcode_id, codeforces_id, codechef_id, hackerrank_id) 
+            `INSERT INTO users (name, email, password, branch, semester, year, leetcode_id, codeforces_id, codechef_id, hackerrank_id, enrollment) 
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-            [name, email, hashedPassword, branch, semester, year, roll_number, leetcode_id, codeforces_id, codechef_id, hackerrank_id]
+            [name, email, password, branch, semester, year, leetcode_id || null, codeforces_id || null, codechef_id || null, hackerrank_id || null, enrollment]
         );
 
         console.log(`✅ New user registered: ${name} (${email})`);
 
-        // Initial Data Fetch (async - don't wait for completion)
-        setTimeout(async () => {
+        // Initial Fetch of stats (async - don't wait for it)
+        if (leetcode_id) {
+          setTimeout(async () => {
             try {
-                const fetchPromises = [];
-                
-                if (leetcode_id) {
-                    fetchPromises.push(
-                        fetchLeetCodeStats(leetcode_id).then(lcStats => {
-                            if (lcStats) {
-                                return pool.query(
-                                    `UPDATE users SET lc_easy=$1, lc_medium=$2, lc_hard=$3 WHERE email=$4`,
-                                    [lcStats.easy, lcStats.medium, lcStats.hard, email]
-                                );
-                            }
-                        })
-                    );
-                }
-
-                if (hackerrank_id) {
-                    fetchPromises.push(
-                        fetchHackerRankStats(hackerrank_id).then(hrStats => {
-                            if (hrStats) {
-                                return pool.query(
-                                    `UPDATE users SET hackerrank_score=$1, hr_solved=$2 WHERE email=$3`,
-                                    [hrStats.score, hrStats.solved || 0, email]
-                                );
-                            }
-                        })
-                    );
-                }
-
-                if (codeforces_id) {
-                    fetchPromises.push(
-                        fetchCodeforcesStats(codeforces_id).then(cfStats => {
-                            if (cfStats) {
-                                return pool.query(
-                                    `UPDATE users SET cf_rating=$1, cf_solved=$2 WHERE email=$3`,
-                                    [cfStats.rating, cfStats.solved, email]
-                                );
-                            }
-                        })
-                    );
-                }
-
-                if (codechef_id) {
-                    fetchPromises.push(
-                        fetchCodeChefStats(codechef_id).then(ccStats => {
-                            if (ccStats) {
-                                return pool.query(
-                                    `UPDATE users SET cc_rating=$1, cc_solved=$2 WHERE email=$3`,
-                                    [ccStats.rating, ccStats.solved, email]
-                                );
-                            }
-                        })
-                    );
-                }
-
-                await Promise.allSettled(fetchPromises);
-
-                const userRes = await pool.query("SELECT lc_easy, lc_medium, lc_hard FROM users WHERE email = $1", [email]);
-                const user = userRes.rows[0];
-                if (user) {
-                    const totalSolved = (user.lc_easy || 0) + (user.lc_medium || 0) + (user.lc_hard || 0);
-                    await pool.query(`UPDATE users SET total_solved_snapshot=$1 WHERE email=$2`, [totalSolved, email]);
-                    await pool.query(RECALCULATE_SCORE_QUERY, [email]);
-                }
-                
-                console.log(`✅ Stats fetched for: ${name}`);
-            } catch (error) {
-                console.error(`❌ Error fetching stats for ${name}:`, error);
+              const lcStats = await fetchLeetCodeStats(leetcode_id);
+              if (lcStats) await pool.query(
+                `UPDATE users SET lc_easy=$1, lc_medium=$2, lc_hard=$3 WHERE email=$4`, 
+                [lcStats.easy, lcStats.medium, lcStats.hard, email]
+              );
+            } catch(e) {
+              console.error('LeetCode initial fetch error:', e);
             }
-        }, 1000);
+          }, 1000);
+        }
 
-        res.status(201).json({ 
-            message: "Registration Successful! 🎉", 
-            user: { name, email, roll_number, branch, semester, year }
+        // Send welcome email
+        try {
+          const welcomeMail = {
+            from: '"Code Campus Team" <noreply@codecampus.com>',
+            to: email,
+            subject: '🎉 Welcome to Code Campus!',
+            html: `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+                <div style="text-align: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                            padding: 30px; border-radius: 10px 10px 0 0; color: white;">
+                  <h1 style="margin: 0;">Welcome to Code Campus!</h1>
+                  <p style="opacity: 0.9;">Your coding journey begins now</p>
+                </div>
+                
+                <div style="padding: 30px; background: #f9f9f9; border-radius: 0 0 10px 10px;">
+                  <h2>Hello ${name},</h2>
+                  <p>Welcome to the official coding platform of ITM Gwalior! 🚀</p>
+                  
+                  <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #667eea;">
+                    <p style="margin: 10px 0;"><strong>📍 Your Account Details:</strong></p>
+                    <p style="margin: 5px 0;">• Email: ${email}</p>
+                    <p style="margin: 5px 0;">• Branch: ${branch}</p>
+                    <p style="margin: 5px 0;">• Year: ${year}</p>
+                    <p style="margin: 5px 0;">• Enrollment: ${enrollment}</p>
+                  </div>
+                  
+                  <p><strong>Next Steps:</strong></p>
+                  <ol style="line-height: 2;">
+                    <li>Connect your coding profiles (LeetCode, Codeforces, etc.)</li>
+                    <li>Start solving problems and tracking progress</li>
+                    <li>Compete on the leaderboard with peers</li>
+                    <li>Analyze your performance with detailed charts</li>
+                  </ol>
+                  
+                  <div style="text-align: center; margin: 30px 0;">
+                    <a href="https://your-frontend-url.com/dashboard" style="background: #4F46E5; color: white; 
+                       padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">
+                      Go to Dashboard →
+                    </a>
+                  </div>
+                  
+                  <p style="color: #666; font-size: 14px; text-align: center;">
+                    Need help? Contact us at support@codecampus.com
+                  </p>
+                </div>
+                
+                <div style="margin-top: 20px; text-align: center; color: #999; font-size: 12px;">
+                  <p>© ${new Date().getFullYear()} Code Campus - ITM Gwalior</p>
+                </div>
+              </div>
+            `
+          };
+
+          await transporter.sendMail(welcomeMail);
+          console.log(`📧 Welcome email sent to ${email}`);
+        } catch (emailError) {
+          console.log('Welcome email failed (but user registered):', emailError.message);
+        }
+
+        // Get final user data
+        const finalUser = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
+        
+        res.json({ 
+          success: true,
+          message: "Registration Successful! Welcome to Code Campus.", 
+          user: finalUser.rows[0] 
         });
 
-    } catch (err) {
-        console.error('❌ Registration error:', err);
-        res.status(500).json({ message: "Server Error during registration: " + err.message });
+    } catch (err) { 
+        console.error('❌ Registration error:', err); 
+        res.status(500).json({ 
+          success: false,
+          message: "Server Error during registration", 
+          error: process.env.NODE_ENV === 'development' ? err.message : undefined 
+        });
     }
 });
 
-// 2. LOGIN
+// 4. LOGIN
 app.post('/api/login', async (req, res) => {
     try {
         const { email, password } = req.body;
-        
-        console.log('🔐 Login attempt for:', email);
-        
-        if (!email || !password) {
-            return res.status(400).json({ message: "Email and password are required" });
-        }
-
-        const userResult = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
-        
-        if (userResult.rows.length === 0) {
-            console.log('❌ User not found:', email);
-            return res.status(401).json({ message: "User not found!" });
-        }
-
-        const user = userResult.rows[0];
-        console.log('👤 User found:', user.email);
-        
-        let isValidPassword = false;
-        
-        if (user.password && user.password.length < 60) {
-            isValidPassword = (user.password === password);
-            console.log('🔐 Using plain text comparison');
-        } else {
-            isValidPassword = await bcrypt.compare(password, user.password);
-            console.log('🔐 Using bcrypt comparison');
-        }
-
-        if (isValidPassword) {
-            const { password: _, ...userWithoutPassword } = user;
-            console.log('✅ Login successful for:', email);
-            return res.json({ 
-                message: "Login Successful! ✅", 
-                user: userWithoutPassword 
-            });
-        }
-
-        console.log('❌ Invalid password for:', email);
-        return res.status(401).json({ message: "Invalid password!" });
-
-    } catch (err) {
-        console.error('❌ Login error:', err);
-        res.status(500).json({ message: "Server Error during login: " + err.message });
+        const user = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
+        if (user.rows.length === 0) return res.status(401).json({ message: "User not found!" });
+        if (password !== user.rows[0].password) return res.status(401).json({ message: "Incorrect Password!" });
+        res.json({ message: "Login Successful", user: user.rows[0] });
+    } catch (err) { 
+        res.status(500).json({ message: "Server Error", error: err.message });
     }
 });
 
-// 3. UPDATE PROFILE
+// 5. UPDATE PROFILE
 app.put('/api/update-profile', async (req, res) => {
     try {
         const { email, leetcode_id, codeforces_id, codechef_id, hackerrank_id, bg_skin } = req.body;
-        
-        if (!email) {
-            return res.status(400).json({ message: "Email is required" });
-        }
-
         const updatedUser = await pool.query(
-            `UPDATE users SET leetcode_id=$1, codeforces_id=$2, codechef_id=$3, hackerrank_id=$4, bg_skin=$5 
-             WHERE email=$6 RETURNING id, name, email, roll_number, branch, semester, year, role, leetcode_id, codeforces_id, codechef_id, hackerrank_id, bg_skin`,
+            `UPDATE users SET leetcode_id=$1, codeforces_id=$2, codechef_id=$3, hackerrank_id=$4, bg_skin=$5 WHERE email=$6 RETURNING *`,
             [leetcode_id, codeforces_id, codechef_id, hackerrank_id, bg_skin, email]
         );
-        
-        res.json({ 
-            message: "Profile Updated Successfully! ✅", 
-            user: updatedUser.rows[0] 
-        });
-    } catch (err) {
-        console.error('Update profile error:', err);
-        res.status(500).json({ message: "Server Error while updating profile" });
+        res.json({ message: "Profile Saved!", user: updatedUser.rows[0] });
+    } catch (err) { 
+        res.status(500).json({ message: "Server Error", error: err.message });
     }
 });
 
-// 4. GET USER PROFILE
-app.get('/api/user/:email', async (req, res) => {
-    try {
-        const { email } = req.params;
-        const user = await pool.query(
-            "SELECT id, name, email, roll_number, branch, semester, year, role, leetcode_id, codeforces_id, codechef_id, hackerrank_id, bg_skin FROM users WHERE email = $1",
-            [email]
-        );
-        
-        if (user.rows.length === 0) {
-            return res.status(404).json({ message: "User not found" });
-        }
-        
-        res.json(user.rows[0]);
-    } catch (err) {
-        console.error('User profile error:', err);
-        res.status(500).json({ message: "Server Error" });
-    }
-});
-
-// 5. REFRESH STATS
+// 6. REFRESH STATS
 app.post('/api/refresh-stats', async (req, res) => {
     try {
         const { email } = req.body;
-        
-        if (!email) {
-            return res.status(400).json({ message: "Email is required" });
-        }
-
         const userRes = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
-        if (userRes.rows.length === 0) {
-            return res.status(404).json({ message: "User not found" });
-        }
-
         const user = userRes.rows[0];
+
+        if (!user) return res.status(404).json({ message: "User not found" });
+
+        // Date Logic
         const today = new Date().toISOString().slice(0, 10);
         const lastDate = user.last_fetched ? new Date(user.last_fetched).toISOString().slice(0, 10) : null;
         let count = (lastDate === today) ? user.fetch_count : 0;
 
-        if (count >= 5) {
-            return res.status(429).json({ 
-                message: "Daily refresh limit reached! (5/5) Try again tomorrow. 🕒",
-                limit: 5,
-                used: count
-            });
-        }
+        if (count >= 5) return res.status(429).json({ message: "Daily Limit (5/5) Reached! Try tomorrow." });
 
-        console.log(`🔄 Refreshing stats for: ${email} (${count + 1}/5)`);
+        console.log(`🔄 Refreshing: ${email} (${count + 1}/5)`);
 
-        const fetchPromises = [];
-
+        // Fetch All
         if (user.leetcode_id) {
-            fetchPromises.push(
-                fetchLeetCodeStats(user.leetcode_id).then(lc => {
-                    if (lc) {
-                        return pool.query(
-                            `UPDATE users SET lc_easy=$1, lc_medium=$2, lc_hard=$3 WHERE email=$4`,
-                            [lc.easy, lc.medium, lc.hard, email]
-                        );
-                    }
-                })
-            );
+            try {
+                const lc = await fetchLeetCodeStats(user.leetcode_id);
+                if (lc) await pool.query(`UPDATE users SET lc_easy=$1, lc_medium=$2, lc_hard=$3 WHERE email=$4`, [lc.easy, lc.medium, lc.hard, email]);
+            } catch(e) {
+                console.error('LeetCode fetch error:', e);
+            }
         }
-
-        if (user.codeforces_id) {
-            fetchPromises.push(
-                fetchCodeforcesStats(user.codeforces_id).then(cf => {
-                    if (cf) {
-                        return pool.query(
-                            `UPDATE users SET cf_rating=$1, cf_solved=$2 WHERE email=$3`,
-                            [cf.rating, cf.solved, email]
-                        );
-                    }
-                })
-            );
-        }
-
-        if (user.codechef_id) {
-            fetchPromises.push(
-                fetchCodeChefStats(user.codechef_id).then(cc => {
-                    if (cc) {
-                        return pool.query(
-                            `UPDATE users SET cc_rating=$1, cc_solved=$2 WHERE email=$3`,
-                            [cc.rating, cc.solved, email]
-                        );
-                    }
-                })
-            );
-        }
-
         if (user.hackerrank_id) {
-            fetchPromises.push(
-                fetchHackerRankStats(user.hackerrank_id).then(hr => {
-                    if (hr) {
-                        return pool.query(
-                            `UPDATE users SET hackerrank_score=$1, hr_solved=$2 WHERE email=$3`,
-                            [hr.score, hr.solved || 0, email]
-                        );
-                    }
-                })
-            );
+            try {
+                const hr = await fetchHackerRankStats(user.hackerrank_id);
+                if (hr) await pool.query(`UPDATE users SET hackerrank_score=$1 WHERE email=$2`, [hr.score, email]);
+            } catch(e) {
+                console.error('HackerRank fetch error:', e);
+            }
+        }
+        if (user.codeforces_id) {
+            try {
+                const cf = await fetchCodeforcesStats(user.codeforces_id);
+                if (cf) await pool.query(`UPDATE users SET cf_rating=$1 WHERE email=$2`, [cf.rating, email]);
+            } catch(e) {
+                console.error('Codeforces fetch error:', e);
+            }
+        }
+        if (user.codechef_id) {
+            try {
+                const cc = await fetchCodeChefStats(user.codechef_id);
+                if (cc) await pool.query(`UPDATE users SET cc_rating=$1 WHERE email=$2`, [cc.rating, email]);
+            } catch(e) {
+                console.error('CodeChef fetch error:', e);
+            }
         }
 
-        await Promise.allSettled(fetchPromises);
+        // Update Time, Count & Score
         await pool.query(`UPDATE users SET last_fetched=NOW(), fetch_count=$1 WHERE email=$2`, [count + 1, email]);
-        
         const finalUser = await pool.query(RECALCULATE_SCORE_QUERY, [email]);
 
-        res.json({ 
-            message: "Stats Refreshed Successfully! ✅", 
-            user: finalUser.rows[0],
-            refreshCount: count + 1,
-            remaining: 5 - (count + 1)
-        });
+        res.json({ message: "Stats Refreshed!", user: finalUser.rows[0] });
 
     } catch (err) {
-        console.error('Refresh stats error:', err);
-        res.status(500).json({ message: "Server Error while refreshing stats" });
+        console.error(err);
+        res.status(500).json({ message: "Server Error", error: err.message });
     }
 });
 
-// 6. LEADERBOARD & CODER OF THE WEEK
+// 7. LEADERBOARD
 app.get('/api/leaderboard', async (req, res) => {
     try {
         const result = await pool.query(`
-            SELECT name, email, roll_number, branch, year, semester, role, passout_year, bg_skin,
-                   lc_easy, lc_medium, lc_hard, total_score, weekly_solved_count,
+            SELECT name, email, branch, year, semester, role, passout_year, bg_skin,
+                   lc_easy, lc_medium, lc_hard, total_score, 
                    cf_rating, cc_rating, hackerrank_score, college_contest_points,
                    leetcode_id, codeforces_id, codechef_id, hackerrank_id
-            FROM users 
-            ORDER BY total_score DESC
+            FROM users ORDER BY total_score DESC
         `);
-
-        const topPerformer = [...result.rows].sort((a, b) => {
-            if (b.weekly_solved_count === a.weekly_solved_count) {
-                return b.total_score - a.total_score;
-            }
-            return b.weekly_solved_count - a.weekly_solved_count;
-        })[0];
-
-        res.json({ 
-            leaderboard: result.rows, 
-            coderOfWeek: topPerformer,
-            totalStudents: result.rows.length,
-            lastUpdated: new Date().toISOString()
-        });
-    } catch (err) {
-        console.error('Leaderboard error:', err);
-        res.status(500).json({ message: "Server Error while fetching leaderboard" });
+        res.json(result.rows);
+    } catch (err) { 
+        res.status(500).json({ message: "Server Error", error: err.message });
     }
 });
 
-// 7. GET TOP 10 PERFORMERS
-app.get('/api/leaderboard/top10', async (req, res) => {
-    try {
-        const result = await pool.query(`
-            SELECT name, email, roll_number, branch, year, semester, role, 
-                   lc_easy, lc_medium, lc_hard, total_score, weekly_solved_count,
-                   cf_rating, cc_rating, hackerrank_score, college_contest_points,
-                   leetcode_id, codeforces_id, codechef_id, hackerrank_id, bg_skin
-            FROM users 
-            ORDER BY total_score DESC
-            LIMIT 10
-        `);
-
-        res.json({
-            topPerformers: result.rows,
-            lastUpdated: new Date().toISOString()
-        });
-    } catch (err) {
-        console.error('Top 10 leaderboard error:', err);
-        res.status(500).json({ message: "Server Error while fetching top performers" });
-    }
-});
-
-// 8. GET GLOBAL METRICS
-app.get('/api/metrics', async (req, res) => {
-    try {
-        const solvedResult = await pool.query(`
-            SELECT 
-                COALESCE(SUM(lc_easy), 0) + 
-                COALESCE(SUM(lc_medium), 0) + 
-                COALESCE(SUM(lc_hard), 0) AS total_solved
-            FROM users
-        `);
-
-        const ratingResult = await pool.query(`
-            SELECT GREATEST(
-                COALESCE(MAX(cf_rating), 0), 
-                COALESCE(MAX(cc_rating), 0)
-            ) AS highest_rating
-            FROM users
-        `);
-
-        const contestEstimateResult = await pool.query(`
-            SELECT COUNT(*) as total_users FROM users
-        `);
-
-        const metrics = {
-            total_solved: solvedResult.rows[0].total_solved || 0,
-            highest_rating: ratingResult.rows[0].highest_rating || 0,
-            contests_participated: Math.floor(contestEstimateResult.rows[0].total_users * 10) || 0,
-            consistency_streak: 365,
-        };
-
-        res.json(metrics);
-    } catch (err) {
-        console.error('Metrics error:', err);
-        res.status(500).json({ message: "Server Error while fetching global metrics" });
-    }
-});
-
-// 9. GET USER ANALYTICS DATA
-app.get('/api/analytics/user/:email', async (req, res) => {
+// 8. RESEND OTP
+app.post('/api/resend-otp', async (req, res) => {
   try {
-    const { email } = req.params;
+    const { email } = req.body;
     
-    const userResult = await pool.query(
-      `SELECT name, email, roll_number, branch, semester, year,
-              lc_easy, lc_medium, lc_hard, cf_rating, cc_rating, 
-              hackerrank_score, hr_solved, cf_solved, cc_solved,
-              total_score, weekly_solved_count, college_contest_points,
-              leetcode_id, codeforces_id, codechef_id, hackerrank_id,
-              created_at, last_fetched
-       FROM users WHERE email = $1`,
+    if (!email) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Email is required' 
+      });
+    }
+
+    // Check if email already registered
+    const userCheck = await pool.query(
+      "SELECT email FROM users WHERE email = $1", 
       [email]
     );
-
-    if (userResult.rows.length === 0) {
-      return res.status(404).json({ message: "User not found" });
+    
+    if (userCheck.rows.length > 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Email already registered.' 
+      });
     }
 
-    const user = userResult.rows[0];
+    // Generate new OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
     
-    const leetcodeTotal = (user.lc_easy || 0) + (user.lc_medium || 0) + (user.lc_hard || 0);
-    const totalSolved = leetcodeTotal + (user.cf_solved || 0) + (user.cc_solved || 0) + (user.hr_solved || 0);
-    
-    const progressData = await calculateProgressMetrics(email);
-    
-    const analytics = {
-      userProfile: {
-        name: user.name,
-        email: user.email,
-        rollNumber: user.roll_number,
-        branch: user.branch,
-        semester: user.semester,
-        year: user.year,
-        joinDate: user.created_at,
-        lastActive: user.last_fetched
-      },
-      platformStats: {
-        leetcode: {
-          easy: user.lc_easy || 0,
-          medium: user.lc_medium || 0,
-          hard: user.lc_hard || 0,
-          total: leetcodeTotal
-        },
-        codeforces: {
-          solved: user.cf_solved || 0,
-          rating: user.cf_rating || 0
-        },
-        codechef: {
-          solved: user.cc_solved || 0,
-          rating: user.cc_rating || 0
-        },
-        hackerrank: {
-          solved: user.hr_solved || 0,
-          score: user.hackerrank_score || 0
-        }
-      },
-      overallMetrics: {
-        totalProblemsSolved: totalSolved,
-        totalScore: user.total_score || 0,
-        weeklySolved: user.weekly_solved_count || 0,
-        contestPoints: user.college_contest_points || 0,
-        platformCount: [user.leetcode_id, user.codeforces_id, user.codechef_id, user.hackerrank_id]
-          .filter(Boolean).length
-      },
-      progressOverTime: progressData,
-      skillDistribution: calculateSkillDistribution(user)
+    // Store OTP with expiration
+    otpStore.set(email, {
+      otp,
+      timestamp: Date.now(),
+      attempts: 0
+    });
+
+    // Send email
+    const mailOptions = {
+      from: '"Code Campus" <noreply@codecampus.com>',
+      to: email,
+      subject: '🔐 New OTP for Code Campus Registration',
+      html: `
+        <div style="font-family: Arial, sans-serif; text-align: center; padding: 20px;">
+          <h2 style="color: #4F46E5;">New OTP Requested</h2>
+          <p>Your new verification code is:</p>
+          <h1 style="background: #4F46E5; color: white; padding: 15px; display: inline-block; 
+                     border-radius: 8px; letter-spacing: 8px; margin: 20px 0;">
+            ${otp}
+          </h1>
+          <p>This code expires in 10 minutes.</p>
+        </div>
+      `
     };
 
-    res.json(analytics);
-  } catch (err) {
-    console.error('Analytics error:', err);
-    res.status(500).json({ message: "Server Error while fetching analytics" });
-  }
-});
-
-// 10. GET COMPARATIVE ANALYSIS
-app.get('/api/analytics/comparison/:email', async (req, res) => {
-  try {
-    const { email } = req.params;
+    await transporter.sendMail(mailOptions);
     
-    const userResult = await pool.query(
-      `SELECT lc_easy, lc_medium, lc_hard, cf_solved, cc_solved, hr_solved, total_score, branch
-       FROM users WHERE email = $1`,
-      [email]
-    );
+    console.log(`📧 OTP resent to ${email}: ${otp}`);
     
-    if (userResult.rows.length === 0) {
-      return res.status(404).json({ message: "User not found" });
-    }
-    
-    const currentUser = userResult.rows[0];
-    const userTotal = (currentUser.lc_easy || 0) + (currentUser.lc_medium || 0) + (currentUser.lc_hard || 0) +
-                     (currentUser.cf_solved || 0) + (currentUser.cc_solved || 0) + (currentUser.hr_solved || 0);
-    
-    const branchAvgResult = await pool.query(
-      `SELECT 
-        AVG(lc_easy + lc_medium + lc_hard + cf_solved + cc_solved + hr_solved) as avg_solved,
-        AVG(total_score) as avg_score,
-        COUNT(*) as total_students
-       FROM users 
-       WHERE branch = $1 AND email != $2`,
-      [currentUser.branch, email]
-    );
-    
-    const overallAvgResult = await pool.query(
-      `SELECT 
-        AVG(lc_easy + lc_medium + lc_hard + cf_solved + cc_solved + hr_solved) as avg_solved,
-        AVG(total_score) as avg_score,
-        COUNT(*) as total_students
-       FROM users 
-       WHERE email != $1`,
-      [email]
-    );
-    
-    const comparison = {
-      userStats: {
-        totalSolved: userTotal,
-        totalScore: currentUser.total_score || 0,
-        branch: currentUser.branch
-      },
-      branchComparison: {
-        avgSolved: Math.round(branchAvgResult.rows[0].avg_solved || 0),
-        avgScore: Math.round(branchAvgResult.rows[0].avg_score || 0),
-        totalStudents: parseInt(branchAvgResult.rows[0].total_students) + 1
-      },
-      overallComparison: {
-        avgSolved: Math.round(overallAvgResult.rows[0].avg_solved || 0),
-        avgScore: Math.round(overallAvgResult.rows[0].avg_score || 0),
-        totalStudents: parseInt(overallAvgResult.rows[0].total_students) + 1
-      },
-      percentile: {
-        branchPercentile: calculatePercentile(userTotal, branchAvgResult.rows[0].avg_solved),
-        overallPercentile: calculatePercentile(userTotal, overallAvgResult.rows[0].avg_solved)
-      }
-    };
-    
-    res.json(comparison);
-  } catch (err) {
-    console.error('Comparison analytics error:', err);
-    res.status(500).json({ message: "Server Error while fetching comparison data" });
-  }
-});
-
-// 11. FIX PASSWORDS ENDPOINT
-app.post('/api/fix-passwords', async (req, res) => {
-    try {
-        const users = await pool.query("SELECT id, email, password FROM users");
-        let fixedCount = 0;
-        
-        for (const user of users.rows) {
-            if (user.password && user.password.length < 60) {
-                const hashedPassword = await bcrypt.hash(user.password, 12);
-                await pool.query("UPDATE users SET password = $1 WHERE id = $2", [hashedPassword, user.id]);
-                console.log(`✅ Fixed password for: ${user.email}`);
-                fixedCount++;
-            }
-        }
-        
-        res.json({ 
-            message: `Passwords fixed successfully! Updated ${fixedCount} users.`,
-            fixedCount 
-        });
-    } catch (error) {
-        console.error('Error fixing passwords:', error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// 12. DEBUG ROUTES
-app.get('/api/debug/routes', (req, res) => {
-    const routes = [];
-    
-    app._router.stack.forEach((middleware) => {
-        if (middleware.route) {
-            routes.push({
-                path: middleware.route.path,
-                methods: Object.keys(middleware.route.methods)
-            });
-        } else if (middleware.name === 'router') {
-            middleware.handle.stack.forEach((handler) => {
-                if (handler.route) {
-                    routes.push({
-                        path: '/api/stats' + handler.route.path,
-                        methods: Object.keys(handler.route.methods)
-                    });
-                }
-            });
-        }
-    });
-    
-    res.json({
-        message: "All registered routes",
-        routes: routes
-    });
-});
-
-app.get('/api/debug/users', async (req, res) => {
-    try {
-        const result = await pool.query('SELECT id, name, email, roll_number, branch, semester, year, total_score FROM users ORDER BY total_score DESC');
-        res.json({
-            realUserCount: result.rows.length,
-            realUsers: result.rows
-        });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// 13. HEALTH CHECK
-app.get('/api/health', (req, res) => {
     res.json({ 
-        status: 'OK', 
-        timestamp: new Date().toISOString(),
-        uptime: process.uptime(),
-        memory: process.memoryUsage()
+      success: true, 
+      message: 'New OTP sent successfully!' 
     });
+
+  } catch (err) {
+    console.error('❌ Resend OTP error:', err);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to resend OTP' 
+    });
+  }
 });
 
-// --- AUTOMATION (Cron Jobs) ---
-cron.schedule('0 0 * * 0', async () => {
-    console.log("📅 Weekly Reset: Updating Snapshots...");
-    try {
-        await pool.query(`
-            UPDATE users 
-            SET total_solved_snapshot = (COALESCE(lc_easy, 0) + COALESCE(lc_medium, 0) + COALESCE(lc_hard, 0)),
-                weekly_solved_count = 0
-        `);
-        console.log("✅ Weekly reset completed successfully");
-    } catch (error) {
-        console.error("❌ Weekly reset failed:", error);
-    }
+// --- AUTOMATION ---
+cron.schedule('0 0 28 2 *', async () => { 
+    await pool.query("UPDATE users SET semester = semester + 1 WHERE semester < 8"); 
 });
 
-cron.schedule('0 0 28 2 *', async () => {
-    console.log("🎓 Incrementing semesters...");
-    try {
-        await pool.query("UPDATE users SET semester = semester + 1 WHERE semester < 8 AND role = 'student'");
-        console.log("✅ Semesters incremented successfully");
-    } catch (error) {
-        console.error("❌ Semester increment failed:", error);
-    }
+cron.schedule('0 0 31 8 *', async () => { 
+    await pool.query("UPDATE users SET semester = semester + 1, year = year + 1 WHERE role = 'student'");
+    const currentYear = new Date().getFullYear();
+    await pool.query(
+        `UPDATE users SET role = 'alumni', passout_year = $1, semester = NULL, year = NULL WHERE semester > 8 AND role = 'student'`, 
+        [currentYear]
+    );
 });
 
-cron.schedule('0 0 31 8 *', async () => {
-    console.log("🎓 Updating years and converting alumni...");
-    try {
-        await pool.query("UPDATE users SET semester = semester + 1, year = year + 1 WHERE role = 'student'");
-        const currentYear = new Date().getFullYear();
-        await pool.query(
-            `UPDATE users SET role = 'alumni', passout_year = $1, semester = NULL, year = NULL 
-             WHERE semester > 8 AND role = 'student'`, 
-            [currentYear]
-        );
-        console.log("✅ Year update and alumni conversion completed");
-    } catch (error) {
-        console.error("❌ Year update failed:", error);
-    }
-});
-
-// Error handling middleware
-app.use((err, req, res, next) => {
-    console.error('Unhandled error:', err);
-    res.status(500).json({ message: "Something went wrong!" });
-});
-
-// 404 handler
-app.use((req, res) => {
-    res.status(404).json({ message: "Endpoint not found" });
-});
-
+// Start server
 app.listen(PORT, () => {
-    console.log(`🚀 Server running on port ${PORT}`);
-    console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`🔗 Health check: http://localhost:${PORT}/api/health`);
-    console.log(`👤 Test registration: http://localhost:${PORT}/api/register`);
-    console.log(`🔐 Test login: http://localhost:${PORT}/api/login`);
-    console.log(`📊 Stats overall: http://localhost:${PORT}/api/stats/overall`);
-    console.log(`🏆 Top 10: http://localhost:${PORT}/api/leaderboard/top10`);
-    console.log(`📈 Analytics: http://localhost:${PORT}/api/analytics/user/test@example.com`);
+    console.log(`✅ Server running on port ${PORT}`);
+    console.log(`🌐 Access at: http://localhost:${PORT}`);
+    console.log(`📧 Email service: ${transporter.options.auth.user ? 'Configured' : 'Not configured'}`);
 });

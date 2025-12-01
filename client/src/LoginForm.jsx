@@ -1,4 +1,8 @@
+
 import React, { useState } from 'react';
+
+// API base URL
+const API_BASE = import.meta.env.VITE_API_URL || 'https://code-campus-2-r20j.onrender.com';
 
 const LoginForm = ({ onLogin, onSwitchToRegister }) => {
   const [email, setEmail] = useState('');
@@ -24,7 +28,7 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
     setMessage('');
     
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_BASE || 'http://localhost:5000'}/api/login`, {
+      const res = await fetch(`${API_BASE}/api/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })

@@ -1,5 +1,9 @@
+
 import React, { useState } from 'react';
 import axios from 'axios';
+
+// API base URL
+const API_BASE = import.meta.env.VITE_API_URL || 'https://code-campus-2-r20j.onrender.com';
 
 const DeveloperLogin = ({ onLogin }) => {
   const [credentials, setCredentials] = useState({
@@ -15,7 +19,7 @@ const DeveloperLogin = ({ onLogin }) => {
     setError('');
 
     try {
-      const response = await axios.post('http://localhost:5000/api/developer/login', credentials);
+      const response = await axios.post(`${API_BASE}/api/developer/login`, credentials);
       localStorage.setItem('developerToken', response.data.token);
       onLogin(response.data.user);
     } catch (err) {

@@ -2,41 +2,40 @@ const axios = require('axios');
 
 async function fetchCodeChefStats(username) {
     try {
-        if (!username) return null;
-        
-        console.log(`🔍 Fetching CodeChef stats for: ${username}`);
-        const url = `https://www.codechef.com/users/${username}`;
+        // 1. Username clean karo
+        const cleanUser = username.replace('@', '').trim();
+
+        const url = `https://www.codechef.com/users/${cleanUser}`;
         const response = await axios.get(url, {
-            timeout: 10000,
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
             }
         });
 
         const html = response.data;
-        
+
+        // 2. Check karo ki user exist karta hai ya nahi (Title check)
         if (html.includes("New to CodeChef?")) {
-            console.log(`❌ User ${username} not found on CodeChef`);
-            return null;
+             // Ye text tab aata hai jab user nahi milta
+             console.log(`❌ CodeChef User ${cleanUser} not found`);
+             return null;
         }
 
-        let rating = 0;
-        let solved = 0;
-        let stars = 0;
-
+        // 3. Rating dhoondo
         const ratingMatch = html.match(/<div class="rating-number">(\d+)<\/div>/);
-        if (ratingMatch && ratingMatch[1]) rating = parseInt(ratingMatch[1], 10);
+        
+        if (ratingMatch && ratingMatch[1]) {
+            const rating = parseInt(ratingMatch[1], 10);
+            console.log(`✅ CodeChef ${cleanUser}: Rating=${rating}`);
+            return { rating };
+        }
 
-        const solvedMatch = html.match(/Fully Solved\s*\((\d+)\)/);
-        if (solvedMatch && solvedMatch[1]) solved = parseInt(solvedMatch[1], 10);
-
-        const starsMatch = html.match(/<div class="rating-star">\s*(\d+)\s*<\/div>/);
-        if (starsMatch && starsMatch[1]) stars = parseInt(starsMatch[1], 10);
-
-        return { rating, solved, stars ,solved};
+        // 4. Agar Rating Number nahi mila, par page load hua -> Matlab User Unrated hai (0 Rating)
+        console.log(`⚠️ CodeChef User ${cleanUser} found but UNRATED (0).`);
+        return { rating: 0 };
 
     } catch (error) {
-        console.error(`❌ Error fetching CodeChef for ${username}:`, error.message);
+        console.error("❌ CodeChef Fetch Error:", error.message);
         return null;
     }
 }
