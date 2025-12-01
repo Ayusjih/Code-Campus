@@ -13,18 +13,41 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // CORS configuration
+const allowedOrigins = [
+  'https://codeecampus.netlify.app',      // Your Netlify frontend
+  'http://localhost:5173',               // Local dev frontend
+  'https://code-campus-2-r20j.onrender.com' // Your Render backend (self)
+];
 app.use(cors({
-  origin: ['https://code-campus-2-r20j.onrender.com', 'http://localhost:5173'],
-  credentials: true
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept']
 }));
-app.use(express.json());
+
+// Handle preflight requests
+app.options('*', cors());
 
 // --- EMAIL TRANSPORTER SETUP ---
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  host: process.env.EMAIL_HOST || 'smtp.gmail.com',
+  port: process.env.EMAIL_PORT || 587,
+  secure: false,
   auth: {
-    user: process.env.EMAIL_USER || 'your-email@gmail.com',
-    pass: process.env.EMAIL_PASS || 'your-app-password'
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS
+  },
+  tls: {
+    rejectUnauthorized: false
   }
 });
 
