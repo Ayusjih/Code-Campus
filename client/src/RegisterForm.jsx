@@ -32,7 +32,7 @@ const RegisterForm = ({ onSwitchToLogin }) => {
     }
 
     try {
-      const API_URL = 'https://code-campus-2-r20.onrender.com'; // FIXED URL
+      const API_URL = 'https://code-campus-2-r20j.onrender.com'; // FIXED URL
       
       const res = await fetch(`${API_URL}/api/otp/request`, {
         method: 'POST',
@@ -65,7 +65,7 @@ const RegisterForm = ({ onSwitchToLogin }) => {
     setLoading(true);
     
     try {
-      const API_URL = 'https://code-campus-2-r20.onrender.com'; // FIXED URL
+      const API_URL = 'https://code-campus-2-r20j.onrender.com'; // FIXED URL
       
       // Step 1: Register user
       const registrationData = {
@@ -131,7 +131,7 @@ const RegisterForm = ({ onSwitchToLogin }) => {
       
       // Fallback: Try simple registration without OTP
       try {
-        const API_URL = 'https://code-campus-2-r20.onrender.com';
+        const API_URL = 'https://code-campus-2-r20j.onrender.com';
         
         // Minimal registration
         const fallbackData = {
