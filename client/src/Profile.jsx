@@ -4,21 +4,21 @@ const Profile = ({ user, onBack, isReadOnly = false }) => {
   const [activeTab, setActiveTab] = useState('statistics');
   const [editMode, setEditMode] = useState(false);
   const [formData, setFormData] = useState({
-    leetcode_id: user.leetcode_id || '',
-    codeforces_id: user.codeforces_id || '',
-    codechef_id: user.codechef_id || '',
-    hackerrank_id: user.hackerrank_id || ''
+    leetcode_handle: user.leetcode_handle || '',
+    codeforces_handle: user.codeforces_handle || '',
+    codechef_handle: user.codechef_handle || '',
+    hackerrank_handle: user.hackerrank_handle || ''
   });
   const [saving, setSaving] = useState(false);
 
-  // Platform statistics data (you can fetch this from your API)
+  // Platform statistics data
   const platformStats = {
     leetcode: {
       problems_solved: user.lc_easy + user.lc_medium + user.lc_hard || 0,
       easy: user.lc_easy || 0,
       medium: user.lc_medium || 0,
       hard: user.lc_hard || 0,
-      ranking: '#879', // You can calculate this
+      ranking: '#879',
       streak: '7 days'
     },
     codechef: {
@@ -44,27 +44,66 @@ const Profile = ({ user, onBack, isReadOnly = false }) => {
   const handleSavePlatforms = async () => {
     setSaving(true);
     try {
-      const res = await fetch('http://localhost:5000/api/update-profile', {
+      // Use Render backend URL, not localhost
+      const res = await fetch('https://code-campus-2-r20.onrender.com/api/auth/update-profile', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: user.email, ...formData })
+        headers: { 
+          'Content-Type': 'application/json',
+          // Add authorization if needed
+          // 'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ 
+          email: user.email, 
+          ...formData 
+        })
       });
+      
       const data = await res.json();
+      
       if (res.ok) {
         alert('Platforms updated successfully!');
         setEditMode(false);
-        // Update local storage and reload user data
-        const updatedUser = { ...user, ...data.user };
-        localStorage.setItem('codecampus_user', JSON.stringify(updatedUser));
-        window.location.reload();
+        
+        // Update local user data with correct field names
+        const updatedUser = { 
+          ...user, 
+          leetcode_handle: formData.leetcode_handle,
+          codeforces_handle: formData.codeforces_handle,
+          codechef_handle: formData.codechef_handle,
+          hackerrank_handle: formData.hackerrank_handle
+        };
+        
+        // Update localStorage if you're using it
+        const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+        if (currentUser.email === user.email) {
+          localStorage.setItem('user', JSON.stringify({
+            ...currentUser,
+            ...updatedUser
+          }));
+        }
+        
+        // Optional: refresh the page or update parent component
+        if (window.location) {
+          window.location.reload();
+        }
+        
       } else {
-        alert('Update failed: ' + data.message);
+        alert('Update failed: ' + (data.error || data.message || 'Unknown error'));
       }
     } catch (err) {
-      alert('Server error during update');
+      console.error('Update error:', err);
+      alert('Server error during update. Check console for details.');
     } finally {
       setSaving(false);
     }
+  };
+
+  // Handle input changes
+  const handleInputChange = (field, value) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
   };
 
   const getPlatformIcon = (platform) => {
@@ -87,11 +126,22 @@ const Profile = ({ user, onBack, isReadOnly = false }) => {
     }
   };
 
+  // Map field names for display (optional)
+  const getDisplayHandle = (platform) => {
+    switch (platform) {
+      case 'leetcode': return user.leetcode_handle || 'Not connected';
+      case 'codeforces': return user.codeforces_handle || 'Not connected';
+      case 'codechef': return user.codechef_handle || 'Not connected';
+      case 'hackerrank': return user.hackerrank_handle || 'Not connected';
+      default: return 'Not connected';
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50/30 p-6">
       <div className="max-w-6xl mx-auto">
         
-        {/* Header */}
+        {/* Header - NO CHANGES */}
         <div className="flex justify-between items-center mb-8">
           <div className="flex items-center gap-4">
             <button 
@@ -136,7 +186,7 @@ const Profile = ({ user, onBack, isReadOnly = false }) => {
           )}
         </div>
 
-        {/* Profile Header Card */}
+        {/* Profile Header Card - NO CHANGES */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 mb-8">
           <div className="flex items-center gap-6">
             <div className="h-24 w-24 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-3xl font-bold text-white shadow-lg">
@@ -174,7 +224,7 @@ const Profile = ({ user, onBack, isReadOnly = false }) => {
           </div>
         </div>
 
-        {/* Tabs Navigation */}
+        {/* Tabs Navigation - NO CHANGES */}
         <div className="flex gap-1 bg-gray-100 p-1 rounded-2xl mb-8">
           {[
             { id: 'statistics', label: 'Platform Statistics', icon: '📊' },
@@ -199,7 +249,7 @@ const Profile = ({ user, onBack, isReadOnly = false }) => {
         {/* Tab Content */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
           
-          {/* Statistics Tab */}
+          {/* Statistics Tab - UPDATED FIELD NAMES */}
           {activeTab === 'statistics' && (
             <div className="space-y-6">
               <h3 className="text-xl font-bold text-gray-900 mb-6">Platform Statistics</h3>
@@ -212,7 +262,7 @@ const Profile = ({ user, onBack, isReadOnly = false }) => {
                   </div>
                   <div>
                     <h4 className="text-lg font-bold text-gray-900">LeetCode</h4>
-                    <p className="text-gray-600 text-sm">{user.leetcode_id || 'Not connected'}</p>
+                    <p className="text-gray-600 text-sm">{getDisplayHandle('leetcode')}</p>
                   </div>
                 </div>
                 
@@ -246,7 +296,7 @@ const Profile = ({ user, onBack, isReadOnly = false }) => {
                   </div>
                   <div>
                     <h4 className="text-lg font-bold text-gray-900">CodeChef</h4>
-                    <p className="text-gray-600 text-sm">{user.codechef_id || 'Not connected'}</p>
+                    <p className="text-gray-600 text-sm">{getDisplayHandle('codechef')}</p>
                   </div>
                 </div>
                 
@@ -270,7 +320,7 @@ const Profile = ({ user, onBack, isReadOnly = false }) => {
                 </div>
               </div>
 
-              {/* Add similar cards for Codeforces and HackerRank */}
+              {/* Codeforces Card */}
               <div className={`bg-gradient-to-r ${getPlatformColor('codeforces')} border rounded-2xl p-6`}>
                 <div className="flex items-center gap-4 mb-4">
                   <div className="h-12 w-12 rounded-xl bg-blue-100 flex items-center justify-center text-blue-600 text-xl">
@@ -278,7 +328,7 @@ const Profile = ({ user, onBack, isReadOnly = false }) => {
                   </div>
                   <div>
                     <h4 className="text-lg font-bold text-gray-900">Codeforces</h4>
-                    <p className="text-gray-600 text-sm">{user.codeforces_id || 'Not connected'}</p>
+                    <p className="text-gray-600 text-sm">{getDisplayHandle('codeforces')}</p>
                   </div>
                 </div>
                 
@@ -301,7 +351,7 @@ const Profile = ({ user, onBack, isReadOnly = false }) => {
             </div>
           )}
 
-          {/* Edit Platforms Tab */}
+          {/* Edit Platforms Tab - UPDATED FIELD NAMES */}
           {activeTab === 'platforms' && (
             <div className="max-w-2xl">
               <h3 className="text-xl font-bold text-gray-900 mb-6">Manage Platform Connections</h3>
@@ -309,10 +359,10 @@ const Profile = ({ user, onBack, isReadOnly = false }) => {
               
               <div className="space-y-6">
                 {[
-                  { key: 'leetcode_id', label: 'LeetCode Username', placeholder: 'Enter your LeetCode username' },
-                  { key: 'codeforces_id', label: 'Codeforces Handle', placeholder: 'Enter your Codeforces handle' },
-                  { key: 'codechef_id', label: 'CodeChef Username', placeholder: 'Enter your CodeChef username' },
-                  { key: 'hackerrank_id', label: 'HackerRank ID', placeholder: 'Enter your HackerRank ID' }
+                  { key: 'leetcode_handle', label: 'LeetCode Username', placeholder: 'Enter your LeetCode username' },
+                  { key: 'codeforces_handle', label: 'Codeforces Handle', placeholder: 'Enter your Codeforces handle' },
+                  { key: 'codechef_handle', label: 'CodeChef Username', placeholder: 'Enter your CodeChef username' },
+                  { key: 'hackerrank_handle', label: 'HackerRank ID', placeholder: 'Enter your HackerRank ID' }
                 ].map(platform => (
                   <div key={platform.key} className="bg-gray-50 p-4 rounded-lg border border-gray-200">
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -321,7 +371,7 @@ const Profile = ({ user, onBack, isReadOnly = false }) => {
                     <input
                       type="text"
                       value={formData[platform.key]}
-                      onChange={(e) => setFormData({ ...formData, [platform.key]: e.target.value })}
+                      onChange={(e) => handleInputChange(platform.key, e.target.value)}
                       placeholder={platform.placeholder}
                       className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
                       disabled={!editMode}
@@ -350,7 +400,7 @@ const Profile = ({ user, onBack, isReadOnly = false }) => {
             </div>
           )}
 
-          {/* Academic Info Tab */}
+          {/* Academic Info Tab - NO CHANGES */}
           {activeTab === 'academic' && (
             <div className="max-w-2xl">
               <h3 className="text-xl font-bold text-gray-900 mb-6">Academic Information</h3>
