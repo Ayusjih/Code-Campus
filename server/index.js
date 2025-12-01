@@ -7,6 +7,8 @@ const fetchCodeforcesStats = require('./codeforcesFetcher');
 const fetchCodeChefStats = require('./codechefFetcher');
 const cron = require('node-cron');
 const nodemailer = require('nodemailer');
+const otpValidator = require('./otpValidator');
+
 require('dotenv').config();
 
 const app = express();
@@ -36,6 +38,8 @@ app.use(cors({
 
 // Handle preflight requests
 app.options('*', cors());
+app.use(express.json());
+app.use('/api/otp', otpValidator);
 
 // --- EMAIL TRANSPORTER SETUP ---
 const transporter = nodemailer.createTransport({
