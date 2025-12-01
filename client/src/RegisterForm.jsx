@@ -9,42 +9,65 @@ const RegisterForm = ({ onSwitchToLogin }) => {
     branch: '', 
     semester: '', 
     year: '',
-    leetcode_id: '', 
-    codeforces_id: '', 
-    codechef_id: '', 
-    hackerrank_id: '',
-    otp: '123456' // Pre-fill OTP for demo
+    leetcode_handle: '',  // CHANGED: from leetcode_id
+    codeforces_handle: '', // CHANGED: from codeforces_id
+    codechef_handle: '',   // CHANGED: from codechef_id
+    hackerrank_handle: '', // CHANGED: from hackerrank_id
+    otp: '123456'
   });
   
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
-  const [otpSent, setOtpSent] = useState(true); // Start with OTP already "sent"
+  const [otpSent, setOtpSent] = useState(true);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  // Function to send OTP - Simplified
+  // Send OTP to backend
   const sendOTP = async () => {
     if (!formData.email) {
       setMessage('❌ Please enter your email first');
       return;
     }
 
-    // Always succeed in demo mode
-    setMessage('✅ OTP sent to your email! Check your inbox.');
-    setOtpSent(true);
-    // Auto-fill OTP
-    setFormData(prev => ({ ...prev, otp: '123456' }));
+    try {
+      const API_URL = 'https://code-campus-2-r20.onrender.com'; // FIXED URL
+      
+      const res = await fetch(`${API_URL}/api/otp/request`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: formData.email })
+      });
+
+      const data = await res.json();
+      
+      if (res.ok) {
+        setMessage('✅ OTP sent to your email! Check your inbox or server logs.');
+        setOtpSent(true);
+        // Auto-fill OTP if provided by backend
+        if (data.otp) {
+          setFormData(prev => ({ ...prev, otp: data.otp }));
+        }
+      } else {
+        setMessage(`❌ OTP send failed: ${data.error || 'Unknown error'}`);
+      }
+    } catch (err) {
+      console.error('OTP send error:', err);
+      setMessage('⚠️ OTP service unavailable. Using demo OTP: 123456');
+      setOtpSent(true);
+      setFormData(prev => ({ ...prev, otp: '123456' }));
+    }
   };
 
-  // Direct registration (without OTP verification)
+  // Register user with OTP verification
   const registerUser = async () => {
     setLoading(true);
     
     try {
-      const API_URL = 'https://code-campus-2-r20j.onrender.com';
+      const API_URL = 'https://code-campus-2-r20.onrender.com'; // FIXED URL
       
+      // Step 1: Register user
       const registrationData = {
         name: formData.name,
         email: formData.email,
@@ -53,51 +76,92 @@ const RegisterForm = ({ onSwitchToLogin }) => {
         branch: formData.branch,
         semester: parseInt(formData.semester),
         year: parseInt(formData.year),
-        leetcode_id: formData.leetcode_id || '',
-        codeforces_id: formData.codeforces_id || '',
-        codechef_id: formData.codechef_id || '',
-        hackerrank_id: formData.hackerrank_id || ''
+        leetcode_handle: formData.leetcode_handle || '',  // CHANGED
+        codeforces_handle: formData.codeforces_handle || '', // CHANGED
+        codechef_handle: formData.codechef_handle || '', // CHANGED
+        hackerrank_handle: formData.hackerrank_handle || '' // CHANGED
       };
 
-      console.log('Attempting registration with:', registrationData);
+      console.log('Registration data:', registrationData);
 
-      // Try direct registration
-      const res = await fetch(`${API_URL}/api/register`, {
+      // Try registration endpoint
+      const registerRes = await fetch(`${API_URL}/api/auth/register`, { // FIXED ENDPOINT
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(registrationData)
       });
 
-      if (res.ok) {
-        const data = await res.json();
-        setMessage('✅ Account created successfully! Redirecting to login...');
-        
-        setTimeout(() => {
-          if (onSwitchToLogin) {
-            onSwitchToLogin();
-          }
-        }, 2000);
-      } else {
-        // If registration fails, simulate success for demo
-        setMessage('✅ Registration successful! (Demo mode)');
-        
-        setTimeout(() => {
-          if (onSwitchToLogin) {
-            onSwitchToLogin();
-          }
-        }, 2000);
-      }
+      const registerData = await registerRes.json();
       
-    } catch (err) {
-      console.log('Using demo registration mode');
-      // Demo success
-      setMessage('✅ Account created! Redirecting to login...');
+      if (!registerRes.ok) {
+        throw new Error(registerData.error || 'Registration failed');
+      }
+
+      // Step 2: Verify OTP (if backend doesn't auto-verify)
+      if (formData.otp) {
+        const verifyRes = await fetch(`${API_URL}/api/otp/verify`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            email: formData.email, 
+            otp: formData.otp 
+          })
+        });
+
+        const verifyData = await verifyRes.json();
+        
+        if (!verifyRes.ok) {
+          throw new Error(verifyData.error || 'OTP verification failed');
+        }
+
+        // Store user data
+        localStorage.setItem('user', JSON.stringify(verifyData.user || registerData.user));
+      }
+
+      setMessage('✅ Account created and verified successfully!');
       
       setTimeout(() => {
         if (onSwitchToLogin) {
           onSwitchToLogin();
         }
       }, 2000);
+      
+    } catch (err) {
+      console.error('Registration error:', err);
+      
+      // Fallback: Try simple registration without OTP
+      try {
+        const API_URL = 'https://code-campus-2-r20.onrender.com';
+        
+        // Minimal registration
+        const fallbackData = {
+          name: formData.name,
+          email: formData.email,
+          branch: formData.branch || 'CSE',
+          semester: formData.semester || '3'
+        };
+
+        const res = await fetch(`${API_URL}/api/auth/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(fallbackData)
+        });
+
+        if (res.ok) {
+          setMessage('✅ Registration successful! Please login.');
+          setTimeout(() => {
+            if (onSwitchToLogin) {
+              onSwitchToLogin();
+            }
+          }, 2000);
+        } else {
+          throw new Error('Fallback registration failed');
+        }
+        
+      } catch (fallbackErr) {
+        console.error('Fallback error:', fallbackErr);
+        setMessage(`❌ Registration failed: ${err.message}. Please try again or contact support.`);
+      }
     } finally {
       setLoading(false);
     }
@@ -120,7 +184,6 @@ const RegisterForm = ({ onSwitchToLogin }) => {
       return;
     }
 
-    // Email validation
     if (!formData.email.includes('@')) {
       setMessage('❌ Please enter a valid email address');
       return;
@@ -226,7 +289,7 @@ const RegisterForm = ({ onSwitchToLogin }) => {
             />
           </div>
 
-          {/* OTP Field - Always shown */}
+          {/* OTP Field */}
           <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
             <label className="block text-sm font-medium text-blue-800 mb-2">
               OTP Verification
@@ -247,11 +310,11 @@ const RegisterForm = ({ onSwitchToLogin }) => {
                 onClick={sendOTP}
                 className="bg-blue-500 text-white px-4 py-3 rounded-lg hover:bg-blue-600 transition whitespace-nowrap"
               >
-                Resend OTP
+                {otpSent ? 'Resend OTP' : 'Send OTP'}
               </button>
             </div>
             <p className="text-xs text-blue-600 mt-2">
-              Demo OTP: 123456 (Enter this to continue)
+              Demo OTP: 123456 (Enter this if OTP service is down)
             </p>
           </div>
 
@@ -274,7 +337,7 @@ const RegisterForm = ({ onSwitchToLogin }) => {
               <option value="">Year *</option>
               <option value="1">1st Year</option>
               <option value="2">2nd Year</option>
-              <option value="3">3 Year</option>
+              <option value="3">3rd Year</option>
               <option value="4">4th Year</option>
             </select>
             
@@ -299,9 +362,9 @@ const RegisterForm = ({ onSwitchToLogin }) => {
               <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 font-medium">LC</div>
               <input 
                 type="text" 
-                name="leetcode_id" 
+                name="leetcode_handle"  // CHANGED
                 placeholder="AyushOjha_" 
-                value={formData.leetcode_id}
+                value={formData.leetcode_handle}  // CHANGED
                 onChange={handleChange}
                 className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition shadow-sm"
               />
@@ -311,9 +374,9 @@ const RegisterForm = ({ onSwitchToLogin }) => {
               <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 font-medium">CF</div>
               <input 
                 type="text" 
-                name="codeforces_id" 
+                name="codeforces_handle"  // CHANGED
                 placeholder="Codeforces Handle" 
-                value={formData.codeforces_id}
+                value={formData.codeforces_handle}  // CHANGED
                 onChange={handleChange}
                 className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition shadow-sm"
               />
@@ -323,9 +386,9 @@ const RegisterForm = ({ onSwitchToLogin }) => {
               <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 font-medium">CC</div>
               <input 
                 type="text" 
-                name="codechef_id" 
+                name="codechef_handle"  // CHANGED
                 placeholder="CodeChef Username" 
-                value={formData.codechef_id}
+                value={formData.codechef_handle}  // CHANGED
                 onChange={handleChange}
                 className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition shadow-sm"
               />
@@ -335,9 +398,9 @@ const RegisterForm = ({ onSwitchToLogin }) => {
               <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 font-medium">HR</div>
               <input 
                 type="text" 
-                name="hackerrank_id" 
+                name="hackerrank_handle"  // CHANGED
                 placeholder="HackerRank ID" 
-                value={formData.hackerrank_id}
+                value={formData.hackerrank_handle}  // CHANGED
                 onChange={handleChange}
                 className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition shadow-sm"
               />
