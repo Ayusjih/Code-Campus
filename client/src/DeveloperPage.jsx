@@ -1,152 +1,397 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 
-// Developer data from the previous Ayush Ojha version (retained)
-const DEVELOPER_INFO = {
-    name: "Ayush Ojha",
-    title: "Full Stack Web Developer",
-    degree: "B.Tech in Information Technology",
-    bio: "Passionate about creating intuitive web experiences and solving real-world problems through technology.",
-    avatar: "https://ui-avatars.com/api/?name=Ayush+Ojha&background=5B21B6&color=fff&size=150&bold=true", 
-    email: "0905IT231028@itm.in", // Placeholder based on provided enrollment
-    social: [
-        { icon: "🔗", link: "#", label: "LinkedIn" },
-        { icon: "💻", link: "#", label: "GitHub" },
-    ],
-    education: {
-        institute: "Madhav Institute of Technology & Science, Gwalior",
-        degree: "B.Tech in Information Technology",
-        duration: "Aug 2023 - Jun 2027",
-        cgpa: "7.5/10",
-        enrollment: "0905IT231028",
-        department: "Information Technology",
-    },
-    achievements: [
-        "Solely created this entire platform from scratch",
-        "Active participant in various coding competitions",
-        "Consistently maintaining good academic performance (CGPA: 7.5)",
-        "Developing practical web development skills alongside academics",
-    ],
-    // Retaining projects as 'Internships' section for structure consistency with the image
-    internships: [ 
-        { company: "ITM GOI Platform", role: "Complete web platform development", duration: "Full Stack", details: "Developed with user authentication and contest management features." },
-        { company: "Various Web Applications", role: "Multiple projects using MERN stack", duration: "MERN Stack", details: "Focusing on modern web technologies and scalable architectures." },
-    ],
-    supporting: [
-        { name: "ITM Faculty/Mentors", title: "Guidance and Support", email: "support@itm.in", enrollment: "N/A" }
-    ]
+// Simple Icons Components
+const Icons = {
+  Book: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>,
+  Star: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" /></svg>,
+  Briefcase: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>,
+  Users: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>,
+  Github: () => <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>,
+  Linkedin: () => <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>,
+  Mail: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
 };
 
-const SectionTitle = ({ children, icon }) => (
-    <h3 className="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
-        <span className="text-xl text-indigo-600">{icon}</span>
-        {children}
-    </h3>
-);
+const DeveloperPage = ({ currentUser }) => {
+  const [developerData, setDeveloperData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [showLogin, setShowLogin] = useState(false);
+  
+  // Credentials now start empty
+  const [loginCredentials, setLoginCredentials] = useState({
+    email: '',
+    password: ''
+  });
+  
+  const [loginError, setLoginError] = useState('');
+  const [isDeveloper, setIsDeveloper] = useState(false);
 
-const DeveloperPageNew = () => {
+  useEffect(() => {
+    fetchDeveloperData();
+    
+    const token = localStorage.getItem('developerToken');
+    if (token) {
+      setIsDeveloper(true);
+    }
+  }, []);
+
+  // Add keyboard shortcut for Ctrl + Alt + D
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      // Check for Ctrl + Alt + D (case insensitive)
+      const isCtrlPressed = event.ctrlKey || event.metaKey; // metaKey for Mac
+      const isAltPressed = event.altKey;
+      const isDPressed = event.key === 'D' || event.key === 'd' || event.keyCode === 68;
+      
+      if (isCtrlPressed && isAltPressed && isDPressed) {
+        event.preventDefault(); // Prevent default browser behavior
+        setShowLogin(true); // Show the login modal
+        
+        // Clear any previous login errors
+        setLoginError('');
+        
+        // Clear any previous credentials
+        setLoginCredentials({
+          email: '',
+          password: ''
+        });
+        
+        console.log('Developer login shortcut triggered!');
+      }
+    };
+
+    // Add event listener
+    document.addEventListener('keydown', handleKeyDown);
+
+    // Clean up on component unmount
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []); // Empty dependency array means this runs once on mount
+
+  const fetchDeveloperData = async () => {
+    try {
+      const response = await axios.get('http://localhost:5000/api/developer/data');
+      setDeveloperData(response.data);
+    } catch (error) {
+      console.error('Error fetching developer data:', error);
+      // Fallback data
+      setDeveloperData({
+        education: [
+          {
+            institution: "Madhav Institute of Technology & Science, Gwalior",
+            degree: "B.Tech in Information Technology",
+            duration: "Aug 2023 - Jun 2027",
+            cgpa: "7.5/10",
+            enrollment: "090517231028",
+            department: "Information Technology"
+          }
+        ],
+        projects: [
+          {
+            title: "ITM GOI Platform",
+            description: "Complete web platform development with user authentication and contest management features.",
+            category: "Full Stack",
+            link: "#",
+            dates: "Oct - Dec 2024"
+          },
+          {
+            title: "MERN Stack Applications",
+            description: "Multiple projects using MERN stack focusing on modern web technologies and scalable architectures.",
+            category: "Web Development",
+            link: "#",
+            dates: "Jan - Mar 2025"
+          },
+          {
+            title: "AI Attendance System",
+            description: "Built an Attendance Management System using face recognition technology.",
+            category: "AI/ML",
+            link: "#",
+            dates: "Nov - Dec 2024"
+          }
+        ],
+        achievements: [
+          "Solely created this entire platform from scratch",
+          "Active participant in various coding competitions",
+          "Consistently maintaining good academic performance",
+          "Developing practical web development skills alongside academics",
+          "Certificates from Oxford Home School & Harvard University"
+        ],
+        guidance: [
+          {
+            source: "Prof. Anjali Sharma",
+            description: "Assistant Professor, IT Department",
+            email: "faculty@mitsgwl.ac.in",
+            role: "Project Guide"
+          }
+        ]
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setLoginError('');
+    try {
+      const response = await axios.post('http://localhost:5000/api/developer/login', loginCredentials);
+      if (response.data.token) {
+        localStorage.setItem('developerToken', response.data.token);
+        setIsDeveloper(true);
+        setShowLogin(false);
+        setLoginError('');
+        window.location.href = '/developer-edit';
+      }
+    } catch (error) {
+      setLoginError(error.response?.data?.message || 'Login failed');
+    }
+  };
+
+  const handleCancelLogin = () => {
+    setShowLogin(false);
+    setLoginError('');
+    setLoginCredentials({
+      email: '',
+      password: ''
+    });
+  };
+
+  if (loading) {
     return (
-        <div className="min-h-screen bg-gray-50 font-sans py-8 px-4">
-            <div className="max-w-4xl mx-auto">
-
-                {/* Header Section */}
-                <header className="text-center mb-10">
-                    <h1 className="text-3xl font-extrabold text-gray-900 mb-1">Meet the Developer</h1>
-                    <p className="text-gray-600 max-w-2xl mx-auto text-sm">
-                        {DEVELOPER_INFO.bio}
-                    </p>
-                </header>
-
-                {/* --- Developer Card (Indigo/Purple Theme) --- */}
-                <div className="bg-gradient-to-r from-indigo-700 to-purple-800 text-white rounded-xl shadow-2xl p-6 mb-8 flex flex-col md:flex-row items-center gap-6">
-                    <img 
-                        src={DEVELOPER_INFO.avatar} 
-                        alt={DEVELOPER_INFO.name} 
-                        className="h-32 w-32 rounded-full object-cover border-4 border-white shadow-xl"
-                    />
-                    <div className="flex-1 text-center md:text-left">
-                        <h2 className="text-2xl font-bold mb-1">{DEVELOPER_INFO.name}</h2>
-                        <p className="text-indigo-200 text-sm font-medium">{DEVELOPER_INFO.degree}</p>
-                        <p className="text-indigo-300 text-xs mt-1">{DEVELOPER_INFO.title}</p>
-                        <div className="flex flex-wrap justify-center md:justify-start gap-3 mt-3">
-                            {DEVELOPER_INFO.social.map((item, index) => (
-                                <a key={index} href={item.link} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs bg-white/20 px-3 py-1 rounded-full hover:bg-white/30 transition">
-                                    {item.icon}
-                                    <span className="font-medium">{item.label}</span>
-                                </a>
-                            ))}
-                            <span className="text-xs text-indigo-300 flex items-center gap-1.5">
-                                ✉️ {DEVELOPER_INFO.email}
-                            </span>
-                        </div>
-                    </div>
-                </div>
-
-                {/* --- Details Grid (CV Layout) --- */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    
-                    {/* COLUMN 1: Education */}
-                    <div className="p-4 bg-white rounded-xl shadow border border-gray-100">
-                        <SectionTitle icon="📚">Education</SectionTitle>
-                        <div className="text-sm text-gray-700 space-y-3">
-                            <p className="font-bold text-gray-900">{DEVELOPER_INFO.education.institute}</p>
-                            <p className="text-indigo-600">{DEVELOPER_INFO.education.degree}</p>
-                            
-                            <ul className="list-none space-y-1 mt-2 bg-gray-50 p-3 rounded-lg border border-gray-200">
-                                <li><span className="font-semibold">Duration:</span> {DEVELOPER_INFO.education.duration}</li>
-                                <li><span className="font-semibold">CGPA:</span> {DEVELOPER_INFO.education.cgpa}</li>
-                                <li><span className="font-semibold">Enrollment:</span> {DEVELOPER_INFO.education.enrollment}</li>
-                                <li><span className="font-semibold">Department:</span> {DEVELOPER_INFO.education.department}</li>
-                            </ul>
-                        </div>
-                    </div>
-
-                    {/* COLUMN 2: Key Achievements */}
-                    <div className="p-4 bg-white rounded-xl shadow border border-gray-100">
-                        <SectionTitle icon="⭐">Key Achievements</SectionTitle>
-                        <ul className="text-sm text-gray-700 space-y-3 list-none pl-0">
-                            {DEVELOPER_INFO.achievements.map((item, index) => (
-                                <li key={index} className="flex items-start gap-2">
-                                    <span className="text-green-500 mt-0.5">✅</span> {item}
-                                </li>
-                            ))}
-                        </ul>
-                    </div>
-                    
-                    {/* INTERNSHIPS / PROJECTS */}
-                    <div className="lg:col-span-2 p-4 bg-white rounded-xl shadow border border-gray-100">
-                        <SectionTitle icon="💼">Projects / Experience</SectionTitle>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {DEVELOPER_INFO.internships.map((proj, index) => (
-                                <div key={index} className="bg-gray-50 p-4 rounded-lg border border-indigo-200/50 hover:shadow-md transition">
-                                    <span className="text-xs font-semibold text-indigo-600 bg-indigo-100 px-2 py-0.5 rounded-full">{proj.duration}</span>
-                                    <h4 className="text-md font-bold text-gray-800 mt-2">{proj.company}</h4>
-                                    <p className="text-xs text-gray-600 mb-3">{proj.role}</p>
-                                    <p className="text-xs text-gray-500 mt-1">{proj.details}</p>
-                                    <a href="#" className="text-xs font-semibold text-indigo-500 hover:underline mt-2 inline-block">View Project →</a>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-
-                {/* --- Supporting Section (ITM Guidance) --- */}
-                <div className="mt-8 p-4 bg-white rounded-xl shadow border border-gray-100">
-                    <SectionTitle icon="🤝">Supporting Guidance</SectionTitle>
-                    <div className="bg-indigo-50 p-4 rounded-lg flex items-center gap-4">
-                        <img 
-                            src={`https://ui-avatars.com/api/?name=${DEVELOPER_INFO.supporting[0].name}&background=EF4444&color=fff&size=80&bold=true`} 
-                            alt={DEVELOPER_INFO.supporting[0].name} 
-                            className="h-12 w-12 rounded-full object-cover border-2 border-white shadow"
-                        />
-                        <div>
-                            <h4 className="text-md font-bold text-gray-800">{DEVELOPER_INFO.supporting[0].name}</h4>
-                            <p className="text-sm text-indigo-600">{DEVELOPER_INFO.supporting[0].title}</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading developer profile...</p>
         </div>
+      </div>
     );
+  }
+
+  const safeData = developerData || { education: [], projects: [], achievements: [], guidance: [] };
+
+  const mainDev = {
+    name: "Ayush Ojha",
+    role: "Full Stack Web Developer",
+    branch: "Information Technology",
+    email: "090517231028@gmail.com",
+    github: "AyushOjha",
+    linkedin: "ayushojha"
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 font-sans text-gray-800 pb-16">
+      
+      {/* 1. Page Title */}
+      <div className="text-center pt-12 pb-10 px-4 relative">
+        <h1 className="text-4xl font-extrabold text-gray-900 mb-3 tracking-tight">Meet the Developer</h1>
+        <p className="text-base text-gray-500 max-w-2xl mx-auto leading-relaxed">
+          Passionate about creating intuitive web experiences and solving real-world problems through technology.
+        </p>
+
+        {/* Hidden/Developer Controls - Only visible AFTER login */}
+        <div className="absolute top-4 right-4">
+          {isDeveloper && (
+            <div className="flex space-x-2">
+              <button 
+                onClick={() => window.location.href = '/developer-edit'} 
+                className="text-xs bg-green-100 text-green-700 px-3 py-1.5 rounded-full font-bold hover:bg-green-200 transition-colors"
+              >
+                Edit Mode
+              </button>
+              <button 
+                onClick={() => { localStorage.removeItem('developerToken'); window.location.reload(); }} 
+                className="text-xs bg-gray-200 text-gray-700 px-3 py-1.5 rounded-full font-bold hover:bg-gray-300 transition-colors"
+              >
+                Logout
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="max-w-6xl mx-auto px-4 sm:px-6">
+
+        {/* Developer Login Modal - Triggered by Shortcut */}
+        {showLogin && (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+            <div className="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-md animate-scale-in">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-2xl font-bold text-gray-800">Developer Access</h3>
+                <span className="text-xs font-mono bg-gray-100 px-2 py-1 rounded text-gray-500">Secure Mode</span>
+              </div>
+              
+              <form onSubmit={handleLogin} className="space-y-5">
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Email</label>
+                  <input type="email" value={loginCredentials.email} onChange={(e) => setLoginCredentials({...loginCredentials, email: e.target.value})} className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" required />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Password</label>
+                  <input type="password" value={loginCredentials.password} onChange={(e) => setLoginCredentials({...loginCredentials, password: e.target.value})} className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" required />
+                </div>
+                
+                {loginError && <div className="p-3 bg-red-50 text-red-600 text-sm rounded-lg border border-red-100 text-center font-medium">{loginError}</div>}
+                
+                <div className="flex gap-3 pt-2">
+                  <button type="button" onClick={handleCancelLogin} className="flex-1 bg-gray-100 text-gray-700 py-3 rounded-xl font-bold hover:bg-gray-200 transition">Cancel</button>
+                  <button type="submit" className="flex-1 bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition shadow-lg shadow-blue-200">Login Dashboard</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* 2. HEADER CARD */}
+        <div className="relative mb-10 rounded-3xl overflow-hidden shadow-xl bg-gradient-to-r from-blue-600 to-purple-700 p-8 md:p-12 flex flex-col md:flex-row items-center gap-8 md:gap-12 transform hover:scale-[1.01] transition-transform duration-500">
+           
+           {/* Profile Picture */}
+           <div className="relative shrink-0">
+             <div className="w-36 h-36 md:w-44 md:h-44 rounded-full border-[6px] border-white/20 shadow-2xl overflow-hidden bg-white/10 backdrop-blur-sm">
+               <img 
+                 src={`https://ui-avatars.com/api/?name=${mainDev.name}&background=111827&color=fff&size=256`} 
+                 alt={mainDev.name} 
+                 className="w-full h-full object-cover"
+               />
+             </div>
+           </div>
+
+           {/* Developer Details */}
+           <div className="flex-1 text-center md:text-left text-white">
+              <h2 className="text-4xl md:text-5xl font-extrabold mb-2 tracking-tight">{mainDev.name}</h2>
+              <p className="text-blue-100 font-medium text-lg md:text-xl mb-3">{mainDev.branch}</p>
+              <p className="text-white/80 text-sm md:text-base mb-8 max-w-lg mx-auto md:mx-0 font-light leading-relaxed">{mainDev.role}</p>
+              
+              {/* Social Pills */}
+              <div className="flex flex-wrap justify-center md:justify-start gap-3">
+                 <a href="#" className="flex items-center gap-2 px-5 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-full text-sm font-semibold backdrop-blur-md border border-white/20 transition-all hover:-translate-y-1">
+                    <Icons.Github /> {mainDev.github}
+                 </a>
+                 <a href="#" className="flex items-center gap-2 px-5 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-full text-sm font-semibold backdrop-blur-md border border-white/20 transition-all hover:-translate-y-1">
+                    <Icons.Linkedin /> {mainDev.linkedin}
+                 </a>
+                 <a href={`mailto:${mainDev.email}`} className="flex items-center gap-2 px-5 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-full text-sm font-semibold backdrop-blur-md border border-white/20 transition-all hover:-translate-y-1">
+                    <Icons.Mail /> {mainDev.email}
+                 </a>
+              </div>
+           </div>
+        </div>
+
+        {/* 3. Education & Achievements Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
+          
+          {/* Education Card */}
+          <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 hover:shadow-xl transition-shadow duration-300">
+            <div className="flex items-center gap-3 mb-6 pb-4 border-b border-gray-100">
+               <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl"><Icons.Book /></div>
+               <h3 className="font-bold text-xl text-gray-800">Education</h3>
+            </div>
+            {safeData.education.length > 0 ? safeData.education.map((edu, idx) => (
+              <div key={idx} className="pl-2">
+                 <h4 className="font-bold text-lg text-gray-900">{edu.institution}</h4>
+                 <p className="text-gray-600 font-medium mt-1">{edu.degree}</p>
+                 <div className="flex flex-wrap items-center gap-3 mt-4">
+                    <span className="text-xs bg-blue-50 text-blue-700 px-3 py-1 rounded-full font-bold border border-blue-100">📅 {edu.duration}</span>
+                    <span className="text-xs bg-green-50 text-green-700 px-3 py-1 rounded-full font-bold border border-green-100">CGPA: {edu.cgpa}</span>
+                 </div>
+                 <div className="mt-4 text-sm text-gray-500 space-y-1 bg-gray-50 p-3 rounded-lg border border-gray-100">
+                    <p><span className="font-bold text-gray-700">Enrollment:</span> {edu.enrollment}</p>
+                    <p><span className="font-bold text-gray-700">Dept:</span> {edu.department}</p>
+                 </div>
+              </div>
+            )) : <p className="text-gray-400 italic">No education details added.</p>}
+          </div>
+
+          {/* Achievements Card */}
+          <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 hover:shadow-xl transition-shadow duration-300">
+            <div className="flex items-center gap-3 mb-6 pb-4 border-b border-gray-100">
+               <div className="p-2.5 bg-orange-50 text-orange-500 rounded-xl"><Icons.Star /></div>
+               <h3 className="font-bold text-xl text-gray-800">Key Achievements</h3>
+            </div>
+            <ul className="space-y-4">
+              {safeData.achievements.length > 0 ? safeData.achievements.map((item, idx) => (
+                <li key={idx} className="flex items-start gap-3 text-gray-700 group p-2 hover:bg-orange-50/50 rounded-lg transition-colors">
+                   <span className="text-orange-400 mt-1 text-sm group-hover:scale-125 transition-transform">⭐</span>
+                   <span className="text-sm font-medium leading-relaxed">{item}</span>
+                </li>
+              )) : <p className="text-gray-400 italic">No achievements added.</p>}
+            </ul>
+          </div>
+
+        </div>
+
+        {/* 4. Internships / Projects Section */}
+        <div className="mb-12">
+          <div className="flex items-center gap-3 mb-8 px-2">
+             <div className="p-2.5 bg-purple-100 text-purple-600 rounded-xl">
+                <Icons.Briefcase />
+             </div>
+             <h3 className="font-bold text-2xl text-gray-800">Projects & Experience</h3>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {safeData.projects.length > 0 ? safeData.projects.map((proj, idx) => (
+              <div key={idx} className="bg-white p-7 rounded-3xl shadow-sm border border-gray-100 hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 flex flex-col h-full group relative overflow-hidden">
+                 <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-blue-50 to-transparent rounded-bl-full opacity-50 transition-opacity group-hover:opacity-100"></div>
+                 
+                 <div className="flex justify-between items-start mb-4 relative z-10">
+                    <h4 className="font-bold text-lg text-gray-900 leading-tight group-hover:text-blue-600 transition-colors">{proj.title}</h4>
+                 </div>
+                 
+                 <div className="flex flex-wrap gap-2 mb-4 relative z-10">
+                   {proj.dates && (
+                      <span className="text-[10px] font-bold bg-gray-100 text-gray-600 px-2 py-1 rounded-md whitespace-nowrap border border-gray-200">
+                        {proj.dates}
+                      </span>
+                    )}
+                   <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-md uppercase tracking-wider border border-blue-100">{proj.category}</span>
+                 </div>
+
+                 <p className="text-sm text-gray-600 mb-6 flex-grow leading-relaxed relative z-10">{proj.description}</p>
+                 
+                 {proj.link && proj.link !== '#' && (
+                   <a href={proj.link} className="inline-flex items-center text-sm font-bold text-blue-600 hover:text-blue-800 mt-auto border-t border-gray-50 pt-4 w-full group-hover:border-blue-50 transition-colors">
+                     View Project <span className="ml-auto transform group-hover:translate-x-1 transition-transform">→</span>
+                   </a>
+                 )}
+              </div>
+            )) : <p className="text-gray-400 italic col-span-full text-center py-10">No projects added.</p>}
+          </div>
+        </div>
+
+        {/* 5. Supporting Partner Section */}
+        <div className="mb-8">
+           <div className="flex items-center gap-3 mb-6 px-2">
+              <div className="p-2.5 bg-gray-100 text-gray-600 rounded-xl">
+                 <Icons.Users />
+              </div>
+              <h3 className="font-bold text-2xl text-gray-800">Supporting Partner</h3>
+           </div>
+           
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {safeData.guidance.length > 0 ? safeData.guidance.map((guide, idx) => (
+                 <div key={idx} className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex items-center gap-6 hover:shadow-lg transition-all hover:bg-gray-50/50">
+                    <div className="w-16 h-16 rounded-full bg-gray-100 overflow-hidden flex-shrink-0 border-2 border-white shadow-md">
+                       <img src={`https://ui-avatars.com/api/?name=${guide.source}&background=f3f4f6&color=374151`} alt={guide.source} className="w-full h-full object-cover" />
+                    </div>
+                    <div className="flex-1">
+                       <h4 className="font-bold text-lg text-gray-900">{guide.source}</h4>
+                       <p className="text-sm font-medium text-gray-600">{guide.description}</p>
+                       <div className="flex flex-wrap items-center gap-2 mt-2">
+                           <p className="text-xs text-gray-400 font-bold uppercase tracking-wide">{guide.role || 'Mentor'}</p>
+                           {guide.email && (
+                              <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded border border-blue-100">{guide.email}</span>
+                           )}
+                       </div>
+                    </div>
+                 </div>
+              )) : <p className="text-gray-400 italic">No partners added.</p>}
+           </div>
+        </div>
+
+      </div>
+    </div>
+  );
 };
 
-export default DeveloperPageNew;
+export default DeveloperPage;

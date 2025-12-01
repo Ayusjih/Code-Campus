@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Dashboard from './Dashboard';
 import Leaderboard from './Leaderboard';
 import Home from './Home';
@@ -8,12 +8,16 @@ import DeveloperDetails from './DeveloperPage';
 import LoginForm from './LoginForm';
 import RegisterForm from './RegisterForm';
 import Analytics from './Analytics';
+import DeveloperLogin from './DeveloperLogin';
+import DeveloperDashboard from './DeveloperDashboard';
+import ProfileDashboard from './ProfileDashboard';
 
 // API Base URL
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:5000';
 
 // --- MAIN APP COMPONENT ---
 function App() {
+  
   const [isLoginView, setIsLoginView] = useState(true);
   const [user, setUser] = useState(() => {
     try {
@@ -33,6 +37,12 @@ function App() {
   
   const [inspectUser, setInspectUser] = useState(null);
   const [loading, setLoading] = useState(false);
+  
+  // Developer state
+  const [developer, setDeveloper] = useState(() => {
+    const token = localStorage.getItem('developerToken');
+    return token ? { email: 'developer@codecampus.com', role: 'developer' } : null;
+  });
 
   const changeView = (newView) => {
     setView(newView);
@@ -53,11 +63,32 @@ function App() {
     setView('home');
   };
 
+  // Developer login/logout handlers
+  const handleDeveloperLogin = (devUser) => {
+    setDeveloper(devUser);
+    localStorage.setItem('developerToken', devUser.token || 'dev_token');
+  };
+
+  const handleDeveloperLogout = () => {
+    setDeveloper(null);
+    localStorage.removeItem('developerToken');
+    setView('home');
+  };
+
   const renderContent = () => {
+    // If developer is logged in, show developer dashboard
+    if (developer) {
+      return <DeveloperDashboard developer={developer} onLogout={handleDeveloperLogout} />;
+    }
+
+    // Regular user content
     switch (view) {
       case 'home':
         return <Home onNavigate={changeView} />;
       
+      case 'developer-edit':
+        return <DeveloperDashboard />;
+
       case 'login':
         return (
           <LoginForm 
@@ -80,18 +111,31 @@ function App() {
         );
       
       case 'dashboard':
-      case 'profile':
         if (user) {
           return (
             <Dashboard 
               user={user} 
               onLogout={handleLogout} 
               onShowLeaderboard={() => changeView('leaderboard')} 
+              // THIS CONNECTS THE BUTTON TO THE NEW PAGE
+              onShowProfile={() => changeView('profile-edit')} 
             />
           );
         }
         return <LoginForm onLogin={handleLoginSuccess} onSwitchToRegister={() => changeView('register')} />;
       
+      // NEW PROFILE DASHBOARD ROUTE
+      case 'profile-edit':
+        if (user) {
+            return (
+                <ProfileDashboard 
+                    user={user} 
+                    onBack={() => changeView('dashboard')} 
+                />
+            );
+        }
+        return <LoginForm onLogin={handleLoginSuccess} onSwitchToRegister={() => changeView('register')} />;
+
       case 'leaderboard':
         if (user) {
           return (
@@ -117,7 +161,8 @@ function App() {
         return <LoginForm onLogin={handleLoginSuccess} onSwitchToRegister={() => changeView('register')} />;
 
       case 'developer':
-        return <DeveloperDetails />;
+        // Show developer login page instead of regular developer page
+          return <DeveloperDetails currentUser={user} />;
 
       case 'inspect':
         if (inspectUser) {
@@ -146,6 +191,15 @@ function App() {
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
           <p className="mt-4 text-gray-600">Loading CodeCampus...</p>
         </div>
+      </div>
+    );
+  }
+
+  // Don't show navbar and footer when developer is logged in
+  if (developer) {
+    return (
+      <div className="App">
+        {renderContent()}
       </div>
     );
   }

@@ -1,92 +1,123 @@
 import React from 'react';
+// Ensure this path is correct based on where you saved the logo
+import cllgLogo from './assets/ITM-University-logo.png'; 
 
 const NavbarNew = ({ user, currentView, onViewChange, onLogout }) => {
-    // Generate navigation items based on user status
-    // FIX: Include 'developer' in the core array logic
-    const baseNavItems = ['home', 'contests', 'dashboard', 'leaderboard', 'developer'];
     
-    // Filter nav items: only show auth-protected pages if user exists
-    const navItems = user 
-        ? baseNavItems 
-        : ['home', 'login', 'register']; // Show only basic pages if logged out
-    
-    // Fallback avatar URL using user's name or initial 'CC'
-    const avatarName = user ? user.name : 'CC';
+    // Avatar generator
+    const avatarName = user ? user.name : 'User';
     const avatarUrl = `https://ui-avatars.com/api/?name=${avatarName}&background=4F46E5&color=fff&size=128&bold=true`;
 
     return (
-        // FIX: Navbar uses lighter shadow on white background
-        <nav className="sticky top-0 z-50 bg-white shadow-lg border-b border-gray-100 h-16">
-            <div className="max-w-7xl mx-auto px-4 h-full flex justify-between items-center">
+        <nav className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-gray-100 h-20 transition-all duration-300">
+            <div className="max-w-[1400px] mx-auto px-6 h-full grid grid-cols-12 items-center">
                 
-                {/* Logo and Branding (FIX: Added IMG tag with full logo URL) */}
-                <div className="flex items-center gap-3 cursor-pointer" onClick={() => onViewChange('home')}>
+                {/* --- 1. LEFT: LOGO (Span 3 columns) --- */}
+                <div className="col-span-3 flex items-center justify-start">
                     <img 
-                        src="https://placehold.co/40x40/B8233D/FFFFFF?text=ITM" // Placeholder for the complex logo image
-                        alt="ITM GOI Logo"
-                        className="h-10 w-10 object-contain"
+                        src={cllgLogo} 
+                        alt="ITM University Logo"
+                        className="h-14 w-auto object-contain cursor-pointer hover:scale-105 transition-transform"
+                        onClick={() => onViewChange('home')}
                     />
-                    <div className="flex flex-col leading-none">
-                        <h1 className="text-sm font-bold text-gray-900 tracking-wide">ITM GOI</h1>
-                        <span className="text-[9px] text-gray-500 font-semibold tracking-wider uppercase">GWALIOR • MP</span>
+                </div>
+
+                {/* --- 2. CENTER: NAV PILL (Span 6 columns - Strictly Centered) --- */}
+                <div className="col-span-6 flex justify-center">
+                    <div className="bg-gray-100 p-1 rounded-full flex items-center shadow-inner gap-1">
+                        
+                        {/* HOME BUTTON */}
+                        <button 
+                            onClick={() => onViewChange('home')}
+                            className={`
+                                px-5 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all duration-300
+                                ${currentView === 'home' 
+                                    ? 'bg-indigo-600 text-white shadow-md' 
+                                    : 'text-gray-500 hover:text-indigo-600 hover:bg-white'
+                                }
+                            `}
+                        >
+                            Home
+                        </button>
+
+                        {/* NAV LINKS (Logged Out vs Logged In) */}
+                        {!user ? (
+                            <>
+                                <button 
+                                    onClick={() => onViewChange('login')} 
+                                    className={`
+                                        px-5 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all duration-300
+                                        ${currentView === 'login' 
+                                            ? 'bg-indigo-600 text-white shadow-md' 
+                                            : 'text-gray-500 hover:text-indigo-600 hover:bg-white'
+                                        }
+                                    `}
+                                >
+                                    Login
+                                </button>
+                                <button 
+                                    onClick={() => onViewChange('register')} 
+                                    className={`
+                                        px-5 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all duration-300
+                                        ${currentView === 'register' 
+                                            ? 'bg-indigo-600 text-white shadow-md' 
+                                            : 'text-gray-500 hover:text-indigo-600 hover:bg-white'
+                                        }
+                                    `}
+                                >
+                                    Register
+                                </button>
+                            </>
+                        ) : (
+                            // LOGGED IN LINKS
+                            ['contests', 'dashboard', 'leaderboard'].map(item => (
+                                <button 
+                                    key={item}
+                                    onClick={() => onViewChange(item)}
+                                    className={`
+                                        hidden lg:inline-block px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all duration-300
+                                        ${currentView === item 
+                                            ? 'bg-indigo-600 text-white shadow-md' 
+                                            : 'text-gray-400 hover:text-indigo-600 hover:bg-white'
+                                        }
+                                    `}
+                                >
+                                    {item}
+                                </button>
+                            ))
+                        )}
                     </div>
                 </div>
 
-                {/* Navigation Links (Dynamic) */}
-                <div className="hidden md:flex items-center gap-8 text-sm font-medium text-gray-600">
-                    {navItems.map(item => (
-                        <button 
-                            key={item} 
-                            onClick={() => onViewChange(item)} 
-                            className={`hover:text-indigo-600 transition uppercase tracking-wide ${
-                                // FIX: Use indigo theme for active state
-                                currentView === item 
-                                    ? 'text-indigo-600 font-bold border-b-2 border-indigo-600' 
-                                    : ''
-                            }`}
-                        >
-                            {/* Display "Developer" correctly */}
-                            {item === 'developer' ? 'DEVELOPER' : item.toUpperCase()}
-                        </button>
-                    ))}
-                </div>
-
-                {/* User/Login Section */}
-                <div className="flex items-center gap-4">
-                    {user ? (
-                        <div className="flex items-center gap-3 border-l border-gray-200 pl-4">
-                            <div className="text-right hidden sm:block leading-tight">
-                                <p className="text-sm font-bold text-gray-800">{user.name}</p>
-                                {/* FIX: Logout button uses indigo theme color */}
-                                <button onClick={onLogout} className="text-[10px] font-bold text-indigo-500 hover:underline">LOGOUT</button>
+                {/* --- 3. RIGHT: PROFILE & DEV OPTION (Span 3 columns - Right Aligned) --- */}
+                <div className="col-span-3 flex items-center justify-end gap-4">
+                    
+                    {/* User Profile Info */}
+                    {user && (
+                        <div className="flex items-center gap-3 border-r border-gray-200 pr-4 mr-1">
+                            <div className="text-right hidden xl:block">
+                                <p className="text-xs font-bold text-gray-800 leading-none mb-1">{user.name}</p>
+                                <button onClick={onLogout} className="text-[10px] font-bold text-red-500 hover:underline uppercase">Log Out</button>
                             </div>
-                            <img src={avatarUrl} alt="Profile" className="h-9 w-9 rounded-full border-2 border-indigo-200 shadow-sm cursor-pointer hover:ring-2 ring-indigo-300 transition" />
+                            <img src={avatarUrl} alt="Profile" className="h-9 w-9 rounded-full border-2 border-white shadow-sm" />
                         </div>
-                    ) : (
-                        // FIX: Login button uses indigo primary color
-                        <button onClick={() => onViewChange('login')} className="bg-indigo-600 text-white px-6 py-2 rounded-full font-bold text-xs hover:bg-indigo-700 shadow-md transition transform hover:scale-105">LOGIN</button>
                     )}
+
+                    {/* DEVELOPER OPTION - MOST RIGHT */}
+                    <button 
+                        onClick={() => onViewChange('developer')}
+                        className={`
+                            text-xs font-bold uppercase tracking-wider transition-colors duration-300 border border-transparent hover:border-indigo-100 px-3 py-1.5 rounded-lg whitespace-nowrap
+                            ${currentView === 'developer' ? 'text-indigo-600 bg-indigo-50' : 'text-gray-400 hover:text-indigo-600'}
+                        `}
+                    >
+                        Developer
+                    </button>
                 </div>
             </div>
 
-            {/* Mobile Navigation Menu (if needed in future) */}
-            <div className="md:hidden bg-white border-t border-gray-200">
-                <div className="px-2 pt-2 pb-3 space-y-1">
-                    {navItems.map(item => (
-                        <button
-                            key={item}
-                            onClick={() => onViewChange(item)}
-                            className={`block px-3 py-2 rounded-md text-base font-medium w-full text-left ${
-                                currentView === item
-                                    ? 'text-indigo-800 bg-indigo-50'
-                                    : 'text-gray-600 hover:text-indigo-700 hover:bg-gray-50'
-                            }`}
-                        >
-                            {item.toUpperCase()}
-                        </button>
-                    ))}
-                </div>
-            </div>
+            {/* Mobile Menu Fallback Line */}
+            <div className="md:hidden absolute bottom-0 left-0 w-full h-[1px] bg-gray-100"></div>
         </nav>
     );
 };

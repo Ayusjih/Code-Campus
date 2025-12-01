@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import AnalyticsDashboard from './AnalyticsDashboard';
 
 const Dashboard = ({ user, onLogout, isReadOnly = false, onShowLeaderboard, onShowProfile }) => {
   const [rank, setRank] = useState('--');
@@ -131,16 +132,6 @@ const Dashboard = ({ user, onLogout, isReadOnly = false, onShowLeaderboard, onSh
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('codecampus_user');
-    localStorage.removeItem('codecampus_token');
-    if (onLogout) {
-      onLogout();
-    } else {
-      window.location.href = '/';
-    }
-  };
-
   const getLink = (platform, id) => {
       if (!id) return '#';
       if (platform === 'leetcode') return `https://leetcode.com/${id}`;
@@ -151,6 +142,12 @@ const Dashboard = ({ user, onLogout, isReadOnly = false, onShowLeaderboard, onSh
   };
 
   // Graph Components
+  {user && (
+  <div className="mt-8">
+    <h2 className="text-2xl font-bold text-gray-800 mb-6">Your Analytics & Progress</h2>
+    <AnalyticsDashboard user={user} />
+  </div>
+)}
   const WeeklyProgressGraph = () => (
     <div className="bg-white p-6 rounded-xl border border-gray-200">
       <div className="flex justify-between items-center mb-4">
@@ -326,73 +323,63 @@ const Dashboard = ({ user, onLogout, isReadOnly = false, onShowLeaderboard, onSh
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         
-        {/* --- 1. ENHANCED HEADER BANNER --- */}
+        {/* --- 1. REDESIGNED HEADER BANNER --- */}
         <div className="bg-gradient-to-r from-blue-600 via-blue-500 to-blue-600 rounded-2xl p-8 text-white shadow-xl relative overflow-hidden mb-8">
-          {/* Background Pattern */}
-          <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
-          
-          {/* Animated Background Elements */}
-          <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-16 translate-x-16"></div>
-          <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/5 rounded-full -translate-x-12 translate-y-12"></div>
+            {/* Background Effects */}
+            <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
+            <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-16 translate-x-16"></div>
 
-          <div className="flex justify-between items-start relative z-10">
-            <div className="flex items-center gap-6">
-              <div className="h-24 w-24 rounded-full border-4 border-white/80 bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-3xl font-bold text-white shadow-lg">
-                {user.name.charAt(0).toUpperCase()}
-              </div>
-              
-              <div className="text-left">
-                <h1 className="text-3xl font-bold mb-2 tracking-tight">{user.name}</h1>
-                <p className="text-blue-100 text-lg font-medium mb-3">
-                  {user.branch} • Semester {user.semester} ({user.year} Year)
-                </p>
-                {user.role === 'alumni' && (
-                  <span className="inline-block bg-white/20 text-white text-xs font-bold px-3 py-1.5 rounded-full uppercase tracking-wide border border-white/30">
-                    Alumni {user.passout_year}
-                  </span>
-                )}
-              </div>
-            </div>
-            
-            <div className="flex flex-col items-end gap-4">
-              <div className="text-right">
-                <p className="text-blue-200 text-sm uppercase font-semibold tracking-wider mb-1">Roll Number</p>
-                <p className="font-mono font-bold text-xl tracking-wider opacity-90 bg-white/10 px-4 py-2 rounded-lg">
-                  {user.roll_number || 'Not set'}
-                </p>
-              </div>
-              
-              <div className="flex gap-2">
-                <button 
-                  onClick={onShowProfile}
-                  className="bg-white/20 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-white/30 transition border border-white/30 backdrop-blur-sm flex items-center gap-2"
-                >
-                  <span>👤</span>
-                  Profile
-                </button>
-                <button 
-                  onClick={handleLogout}
-                  className="bg-white/20 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-white/30 transition border border-white/30 backdrop-blur-sm flex items-center gap-2"
-                >
-                  <span>🚪</span>
-                  Logout
-                </button>
-              </div>
-            </div>
-          </div>
+            <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-6">
+                
+                {/* Left: User Identity */}
+                <div className="flex items-center gap-6 w-full md:w-auto">
+                    <div className="h-24 w-24 rounded-full border-4 border-white/80 bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-3xl font-bold text-white shadow-lg shrink-0">
+                        {user.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="text-left">
+                        <h1 className="text-3xl font-bold mb-1 tracking-tight">{user.name}</h1>
+                        <div className="flex flex-wrap items-center gap-3 text-blue-100 text-sm font-medium">
+                            <span>{user.branch || 'Branch N/A'}</span>
+                            <span>•</span>
+                            <span>Sem {user.semester || '-'} ({user.year || '-'} Year)</span>
+                            
+                            {/* Roll Number Badge */}
+                            <span className="bg-white/20 px-2 py-0.5 rounded text-xs font-mono tracking-wider border border-white/30 ml-2">
+                                {user.roll_number || 'ID: N/A'}
+                            </span>
+                        </div>
+                    </div>
+                </div>
 
-          {!isReadOnly && (
-            <div className="absolute top-6 right-6 flex items-center gap-2 bg-white/20 px-4 py-2 rounded-xl text-sm font-medium border border-white/30 backdrop-blur-sm z-10">
-              <span>Auto-synced</span>
-              <button 
-                onClick={handleRefresh} 
-                disabled={refreshing || user.fetch_count >= 5} 
-                className={`hover:text-blue-200 transition-transform ${refreshing ? 'animate-spin' : 'hover:scale-110'}`}
-              >
-                🔄
-              </button>
+                {/* Right: Actions & Status (UPDATED) */}
+                <div className="flex flex-col items-end gap-3 w-full md:w-auto">
+                    
+                    {/* Auto Sync Indicator - Professional Pill Design */}
+                    {!isReadOnly && (
+                        <div className="flex items-center gap-2 bg-white/10 px-3 py-1.5 rounded-full text-xs font-medium border border-white/20 backdrop-blur-md text-blue-50 shadow-sm transition-all hover:bg-white/20">
+                            <div className={`w-1.5 h-1.5 rounded-full ${refreshing ? 'bg-yellow-300 animate-pulse' : 'bg-green-400 shadow-[0_0_8px_rgba(74,222,128,0.6)]'}`}></div>
+                            <span className="tracking-wide">{refreshing ? 'Syncing...' : 'Auto-synced'}</span>
+                            <button 
+                                onClick={handleRefresh} 
+                                disabled={refreshing || user.fetch_count >= 5} 
+                                className="ml-1 opacity-70 hover:opacity-100 transition-opacity"
+                                title="Sync Now"
+                            >
+                                <svg className={`w-3 h-3 ${refreshing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Profile Button - Clean Glassmorphism */}
+                    <button 
+                        onClick={onShowProfile}
+                        className="group flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-5 py-2 rounded-full text-sm font-semibold backdrop-blur-md border border-white/20 transition-all duration-300 shadow-sm hover:shadow-md hover:scale-105"
+                    >
+                        <span>Edit Profile</span>
+                        <svg className="w-4 h-4 text-blue-200 group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                    </button>
+                </div>
             </div>
-          )}
         </div>
 
         {/* --- 2. ENHANCED QUICK STATS ROW --- */}
