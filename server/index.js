@@ -13,8 +13,10 @@ require('dotenv').config();
 const jwt = require("jsonwebtoken");
 const app = express();
 const PORT = process.env.PORT || 5000;
-const hashedPassword = await bcrypt.hash(password, 10);
-const valid = await bcrypt.compare(password,user.rows[0].password);
+
+// --- DELETED CRASHING LINES HERE (16 & 17) ---
+// The logic for hashing and comparing passwords is already correctly 
+// placed inside your /api/register and /api/login routes below.
 
 // CORS configuration
 const allowedOrigins = [
@@ -286,7 +288,7 @@ app.post('/api/verify-otp', async (req, res) => {
   }
 });
 
-// 3. REGISTER USER (after OTP verification)// 3. REGISTER USER (after OTP verification)
+// 3. REGISTER USER (after OTP verification)
 app.post('/api/register', async (req, res) => {
   try {
     const {
@@ -321,7 +323,7 @@ app.post('/api/register', async (req, res) => {
       });
     }
 
-    // 🔐 hash password before insert  (yaha await bilkul safe hai)
+    // 🔐 hash password before insert (This is the correct place for await)
     const hashedPassword = await bcrypt.hash(password, 10);
 
     await pool.query(
@@ -470,6 +472,7 @@ app.post('/api/login', async (req,res)=>{
 
     if(user.rows.length===0) return res.status(400).json({message:"User not found"});
 
+    // This await is correct here because it's inside the async function
     const valid = await bcrypt.compare(password,user.rows[0].password);
     if(!valid) return res.status(401).json({message:"Incorrect Password"});
 
@@ -512,7 +515,6 @@ app.post('/api/developer/login', async (req,res)=>{
     res.status(500).json({message:"Server Error",error:err.message});
   }
 });
-
 
 
 // 5. UPDATE PROFILE
