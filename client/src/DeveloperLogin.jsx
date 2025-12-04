@@ -13,21 +13,24 @@ const DeveloperLogin = ({ onLogin }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  setLoading(true);
+  setError('');
 
-    try {
-      const response = await axios.post(`${API_BASE}/api/developer/login`, credentials);
-      localStorage.setItem('developerToken', response.data.token);
-      onLogin(response.data.user);
-    } catch (err) {
-      setError(err.response?.data?.message || 'Login failed');
-    } finally {
-      setLoading(false);
-    }
-  };
+  try {
+    const response = await axios.post(`${API_BASE}/api/developer/login`, credentials); // <<< fixed
+    localStorage.setItem('developerToken', response.data.token);
+
+    // Redirect inside React instead of 404 navigation
+    if (onLogin) onLogin(response.data.user);
+  } catch (err) {
+    setError(err.response?.data?.message || 'Login failed');
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
