@@ -128,15 +128,6 @@ app.post('/api/send-otp', async (req, res) => {
             🔒 Do not share this OTP with anyone.<br>
             🚀 Enter this code in the registration form to verify your email.
           </p>
-          
-          <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; text-align: center;">
-            <p style="color: #999; font-size: 12px; margin: 5px 0;">
-              If you didn't request this OTP, please ignore this email.
-            </p>
-            <p style="color: #999; font-size: 12px; margin: 5px 0;">
-              © ${new Date().getFullYear()} Code Campus - ITM Gwalior. All rights reserved.
-            </p>
-          </div>
         </div>
       `
     };
@@ -256,9 +247,11 @@ app.post('/api/verify-otp', async (req, res) => {
   }
 });
 
-// 3. REGISTER USER (after OTP verification)
+// 3. REGISTER USER (FIXED & CORRECTED)
 app.post('/api/register', async (req, res) => {
     try {
+        console.log("📝 Register Request:", req.body); // Debug log
+
         // 1. Get data from Frontend
         const { 
             name, email, password, branch, semester, year, enrollment, // Frontend sends 'enrollment'
@@ -286,9 +279,9 @@ app.post('/api/register', async (req, res) => {
             }
         }
 
-        // 4. Insert into Database (Mapping fields correctly)
-        // We map 'enrollment' -> 'roll_number'
-        // We use '_handle' columns as seen in your screenshot
+        // 4. Insert into Database
+        // Mapping 'enrollment' -> 'roll_number'
+        // Using '_handle' columns
         const newUser = await pool.query(
             `INSERT INTO users (
                 name, email, password, branch, semester, year, 
@@ -299,7 +292,7 @@ app.post('/api/register', async (req, res) => {
             RETURNING *`,
             [
                 name, email, password, branch, semester, year, 
-                enrollment, // maps to roll_number
+                enrollment, 
                 leetcode_handle || null, 
                 codeforces_handle || null, 
                 codechef_handle || null, 
@@ -307,16 +300,13 @@ app.post('/api/register', async (req, res) => {
             ]
         );
 
-        console.log(`✅ New user registered: ${name} (${email})`);
+        console.log(`✅ User registered: ${name}`);
 
-        // Send Success Response
         res.json({ 
             success: true,
-            message: "Registration Successful! Welcome to Code Campus.", 
+            message: "Registration Successful!", 
             user: newUser.rows[0] 
         });
-
-        // (Optional: You can keep your email code here if you want)
 
     } catch (err) { 
         console.error('❌ Registration error:', err); 
@@ -327,7 +317,6 @@ app.post('/api/register', async (req, res) => {
         });
     }
 });
-
 
 // 4. LOGIN
 app.post('/api/login', async (req, res) => {
