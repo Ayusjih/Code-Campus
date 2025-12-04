@@ -8,9 +8,9 @@ const fetchCodeChefStats = require('./codechefFetcher');
 const cron = require('node-cron');
 const nodemailer = require('nodemailer');
 const otpValidator = require('./otpValidator');
-
+const bcrypt = require("bcrypt");
 require('dotenv').config();
-
+const jwt = require("jsonwebtoken");
 const app = express();
 const PORT = process.env.PORT || 5000;
 
@@ -287,32 +287,36 @@ app.post('/api/verify-otp', async (req, res) => {
 // 3. REGISTER USER (after OTP verification)
 app.post('/api/register', async (req, res) => {
   try {
-    const { name, email, password, branch, semester, year, leetcode_id, codeforces_id, codechef_id, hackerrank_id, roll_number } = req.body;
+    const { name, email, password, branch, semester, year, leetcode_id, codeforces_id, codechef_id, hackerrank_id, enrollment } = req.body;
 
     // ---------- VALIDATION ----------
-    if (!name || !email || !password || !branch || !semester || !year || !roll_number) {
+    if (!name || !email || !password || !branch || !semester || !year || !enrollment) {
       return res.status(400).json({ message: "All required fields must be filled" });
     }
 
     // Check user exist
     const userCheck = await pool.query(
       "SELECT * FROM users WHERE email = $1 OR roll_number = $2",
-      [email, roll_number]
+      [email, enrollment]
     );
 
     if (userCheck.rows.length > 0) {
       const u = userCheck.rows[0];
       return res.status(401).json({
-        message: u.email === email ? "Email already registered!" : "roll_number already registered!"
+        message: u.email === email ? "Email already registered!" : "Enrollment already registered!"
       });
     }
 
-    // ---------- INSERT USER ----------
-    await pool.query(
-      `INSERT INTO users (name, email, password, branch, semester, year, leetcode_id, codeforces_id, codechef_id, hackerrank_id, roll_number) 
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
-      [name, email, password, branch, semester, year, leetcode_id || null, codeforces_id || null, codechef_id || null, hackerrank_id || null, roll_number]
-    );
+    
+
+// hash password before insert
+const hashedPassword = await bcrypt.hash(password, 10);
+
+await pool.query(
+  `INSERT INTO users (name,email,password,branch,semester,year,leetcode_id,codeforces_id,codechef_id,hackerrank_id,roll_number) 
+   VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+  [name, email, hashedPassword, branch, semester, year, leetcode_id || null, codeforces_id || null, codechef_id || null, hackerrank_id || null, enrollment]
+);
 
     // 🚀 RETURN RESPONSE IMMEDIATELY
     res.json({
@@ -389,7 +393,7 @@ app.post('/api/register', async (req, res) => {
                    <p style="margin: 5px 0;">• Email: ${email}</p>
                    <p style="margin: 5px 0;">• Branch: ${branch}</p>
                    <p style="margin: 5px 0;">• Year: ${year}</p>
-                   <p style="margin: 5px 0;">• Roll Number: ${roll_number}</p>
+                   <p style="margin: 5px 0;">• Roll Number: ${enrollment}</p>
                  </div>
                  
                  <p><strong>Next Steps:</strong></p>
@@ -435,17 +439,60 @@ app.post('/api/register', async (req, res) => {
 });
 
 // 4. LOGIN
-app.post('/api/login', async (req, res) => {
-  try {
-    const { email, password } = req.body;
-    const user = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
-    if (user.rows.length === 0) return res.status(401).json({ message: "User not found!" });
-    if (password !== user.rows[0].password) return res.status(401).json({ message: "Incorrect Password!" });
-    res.json({ message: "Login Successful", user: user.rows[0] });
-  } catch (err) {
-    res.status(500).json({ message: "Server Error", error: err.message });
+
+
+// USER LOGIN
+app.post('/api/login', async (req,res)=>{
+  try{
+    const {email,password} = req.body;
+    const user = await pool.query("SELECT * FROM users WHERE email=$1",[email]);
+
+    if(user.rows.length===0) return res.status(400).json({message:"User not found"});
+
+    const valid = await bcrypt.compare(password,user.rows[0].password);
+    if(!valid) return res.status(401).json({message:"Incorrect Password"});
+
+    const token = jwt.sign({email:user.rows[0].email,role:user.rows[0].role},process.env.JWT_SECRET,{expiresIn:"7d"});
+
+    res.json({
+      success:true,
+      message:"Login Successful",
+      token,
+      user:user.rows[0]
+    });
+
+  }catch(err){
+    res.status(500).json({message:"Server Error",error:err.message});
   }
 });
+
+
+// 4.1 Developer Login
+app.post('/api/developer/login', async (req,res)=>{
+  try{
+    const {email,password} = req.body;
+
+    const result=await pool.query("SELECT * FROM users WHERE email=$1 AND role='developer'",[email]);
+    if(result.rows.length===0) return res.status(403).json({message:"Not Authorized Developer"});
+
+    const user=result.rows[0];
+    const valid=await bcrypt.compare(password,user.password);
+    if(!valid) return res.status(401).json({message:"Wrong Developer Password"});
+
+    const token = jwt.sign(
+      {email:user.email,role:"developer"},
+      process.env.JWT_SECRET,
+      {expiresIn:"7d"}
+    );
+
+    return res.json({success:true,message:"Developer Login Successful",token,user});
+
+  }catch(err){
+    res.status(500).json({message:"Server Error",error:err.message});
+  }
+});
+
+
 
 // 5. UPDATE PROFILE
 app.put('/api/update-profile', async (req, res) => {
