@@ -7,51 +7,24 @@ const fetchCodeforcesStats = require('./codeforcesFetcher');
 const fetchCodeChefStats = require('./codechefFetcher');
 const cron = require('node-cron');
 const nodemailer = require('nodemailer');
-const otpValidator = require('./otpValidator');
-
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
 // CORS configuration
-const allowedOrigins = [
-  'https://codeecampus.netlify.app',      // Your Netlify frontend
-  'http://localhost:5173',               // Local dev frontend
-  'https://code-campus-2-r20j.onrender.com' // Your Render backend (self)
-];
 app.use(cors({
-  origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl)
-    if (!origin) return callback(null, true);
-    
-    if (allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Accept']
+  origin: ['https://code-campus-2-r20j.onrender.com', 'http://localhost:5173'],
+  credentials: true
 }));
-
-// Handle preflight requests
-app.options('*', cors());
 app.use(express.json());
-app.use('/api/otp', otpValidator);
 
 // --- EMAIL TRANSPORTER SETUP ---
 const transporter = nodemailer.createTransport({
-  host: process.env.EMAIL_HOST || 'smtp.gmail.com',
-  port: process.env.EMAIL_PORT || 587,
-  secure: false,
+  service: 'gmail',
   auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
-  },
-  tls: {
-    rejectUnauthorized: false
+    user: process.env.EMAIL_USER || 'your-email@gmail.com',
+    pass: process.env.EMAIL_PASS || 'your-app-password'
   }
 });
 
@@ -286,127 +259,75 @@ app.post('/api/verify-otp', async (req, res) => {
 // 3. REGISTER USER (after OTP verification)
 app.post('/api/register', async (req, res) => {
     try {
-        const { name, email, password, branch, semester, year, leetcode_id, codeforces_id, codechef_id, hackerrank_id, enrollment } = req.body;
+        // 1. Get data from Frontend
+        const { 
+            name, email, password, branch, semester, year, enrollment, // Frontend sends 'enrollment'
+            leetcode_handle, codeforces_handle, codechef_handle, hackerrank_handle 
+        } = req.body;
         
-        // Validate required fields
+        // 2. Validate
         if (!name || !email || !password || !branch || !semester || !year || !enrollment) {
-          return res.status(400).json({ 
-            message: "All required fields must be filled" 
-          });
+          return res.status(400).json({ message: "All required fields must be filled" });
         }
 
-        const userCheck = await pool.query("SELECT * FROM users WHERE email = $1 OR enrollment = $2", [email, enrollment]);
+        // 3. Check for duplicates (Using 'roll_number' to match DB)
+        const userCheck = await pool.query(
+            "SELECT * FROM users WHERE email = $1 OR roll_number = $2", 
+            [email, enrollment]
+        );
+        
         if (userCheck.rows.length > 0) {
-          const existingUser = userCheck.rows[0];
-          if (existingUser.email === email) {
-            return res.status(401).json({ message: "Email already registered!" });
-          }
-          if (existingUser.enrollment === enrollment) {
-            return res.status(401).json({ message: "Enrollment number already registered!" });
-          }
+            const existingUser = userCheck.rows[0];
+            if (existingUser.email === email) {
+                return res.status(401).json({ message: "Email already registered!" });
+            }
+            if (existingUser.roll_number === enrollment) {
+                return res.status(401).json({ message: "Enrollment number already registered!" });
+            }
         }
 
-        // Insert user into database
-        await pool.query(
-            `INSERT INTO users (name, email, password, branch, semester, year, leetcode_id, codeforces_id, codechef_id, hackerrank_id, enrollment) 
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-            [name, email, password, branch, semester, year, leetcode_id || null, codeforces_id || null, codechef_id || null, hackerrank_id || null, enrollment]
+        // 4. Insert into Database (Mapping fields correctly)
+        // We map 'enrollment' -> 'roll_number'
+        // We use '_handle' columns as seen in your screenshot
+        const newUser = await pool.query(
+            `INSERT INTO users (
+                name, email, password, branch, semester, year, 
+                roll_number, 
+                leetcode_handle, codeforces_handle, codechef_handle, hackerrank_handle,
+                leetcode_score, codeforces_score, codechef_score, hackerrank_score, total_score
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 0, 0, 0, 0, 0) 
+            RETURNING *`,
+            [
+                name, email, password, branch, semester, year, 
+                enrollment, // maps to roll_number
+                leetcode_handle || null, 
+                codeforces_handle || null, 
+                codechef_handle || null, 
+                hackerrank_handle || null
+            ]
         );
 
         console.log(`✅ New user registered: ${name} (${email})`);
 
-        // Initial Fetch of stats (async - don't wait for it)
-        if (leetcode_id) {
-          setTimeout(async () => {
-            try {
-              const lcStats = await fetchLeetCodeStats(leetcode_id);
-              if (lcStats) await pool.query(
-                `UPDATE users SET lc_easy=$1, lc_medium=$2, lc_hard=$3 WHERE email=$4`, 
-                [lcStats.easy, lcStats.medium, lcStats.hard, email]
-              );
-            } catch(e) {
-              console.error('LeetCode initial fetch error:', e);
-            }
-          }, 1000);
-        }
-
-        // Send welcome email
-        try {
-          const welcomeMail = {
-            from: '"Code Campus Team" <noreply@codecampus.com>',
-            to: email,
-            subject: '🎉 Welcome to Code Campus!',
-            html: `
-              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-                <div style="text-align: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
-                            padding: 30px; border-radius: 10px 10px 0 0; color: white;">
-                  <h1 style="margin: 0;">Welcome to Code Campus!</h1>
-                  <p style="opacity: 0.9;">Your coding journey begins now</p>
-                </div>
-                
-                <div style="padding: 30px; background: #f9f9f9; border-radius: 0 0 10px 10px;">
-                  <h2>Hello ${name},</h2>
-                  <p>Welcome to the official coding platform of ITM Gwalior! 🚀</p>
-                  
-                  <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #667eea;">
-                    <p style="margin: 10px 0;"><strong>📍 Your Account Details:</strong></p>
-                    <p style="margin: 5px 0;">• Email: ${email}</p>
-                    <p style="margin: 5px 0;">• Branch: ${branch}</p>
-                    <p style="margin: 5px 0;">• Year: ${year}</p>
-                    <p style="margin: 5px 0;">• Enrollment: ${enrollment}</p>
-                  </div>
-                  
-                  <p><strong>Next Steps:</strong></p>
-                  <ol style="line-height: 2;">
-                    <li>Connect your coding profiles (LeetCode, Codeforces, etc.)</li>
-                    <li>Start solving problems and tracking progress</li>
-                    <li>Compete on the leaderboard with peers</li>
-                    <li>Analyze your performance with detailed charts</li>
-                  </ol>
-                  
-                  <div style="text-align: center; margin: 30px 0;">
-                    <a href="https://your-frontend-url.com/dashboard" style="background: #4F46E5; color: white; 
-                       padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">
-                      Go to Dashboard →
-                    </a>
-                  </div>
-                  
-                  <p style="color: #666; font-size: 14px; text-align: center;">
-                    Need help? Contact us at support@codecampus.com
-                  </p>
-                </div>
-                
-                <div style="margin-top: 20px; text-align: center; color: #999; font-size: 12px;">
-                  <p>© ${new Date().getFullYear()} Code Campus - ITM Gwalior</p>
-                </div>
-              </div>
-            `
-          };
-
-          await transporter.sendMail(welcomeMail);
-          console.log(`📧 Welcome email sent to ${email}`);
-        } catch (emailError) {
-          console.log('Welcome email failed (but user registered):', emailError.message);
-        }
-
-        // Get final user data
-        const finalUser = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
-        
+        // Send Success Response
         res.json({ 
-          success: true,
-          message: "Registration Successful! Welcome to Code Campus.", 
-          user: finalUser.rows[0] 
+            success: true,
+            message: "Registration Successful! Welcome to Code Campus.", 
+            user: newUser.rows[0] 
         });
+
+        // (Optional: You can keep your email code here if you want)
 
     } catch (err) { 
         console.error('❌ Registration error:', err); 
         res.status(500).json({ 
-          success: false,
-          message: "Server Error during registration", 
-          error: process.env.NODE_ENV === 'development' ? err.message : undefined 
+            success: false,
+            message: "Server Error during registration", 
+            error: err.message 
         });
     }
 });
+
 
 // 4. LOGIN
 app.post('/api/login', async (req, res) => {
