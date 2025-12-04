@@ -289,6 +289,7 @@ app.post('/api/verify-otp', async (req, res) => {
 });
 
 // 3. REGISTER USER (after OTP verification)
+
 app.post('/api/register', async (req, res) => {
   try {
     const {
@@ -462,34 +463,36 @@ app.post('/api/register', async (req, res) => {
 
 
 // 4. LOGIN
-// USER LOGIN (PLAINTEXT PASSWORD CHECK)
-app.post('/api/login', async (req, res) => {
-  try {
-    const { email, password } = req.body;
-    const user = await pool.query("SELECT * FROM users WHERE email=$1", [email]);
+// USER LOGIN (PLAINTEXT PASSWORD CHECK// USER LOGIN (BCRYPT SECURE LOGIN)
+app.post('/api/login', async (req,res)=>{
+  try{
+    const {email,password} = req.body;
+    const user = await pool.query("SELECT * FROM users WHERE email=$1",[email]);
 
-    if (user.rows.length === 0)
-      return res.status(400).json({ message: "User not found" });
+    if(user.rows.length === 0)
+      return res.status(400).json({message:"User not found"});
 
-    // 🔥 Plain text compare instead of bcrypt
-    if (password !== user.rows[0].password)
-      return res.status(401).json({ message: "Incorrect Password" });
+    // 🔥 Compare entered password with hashed password from DB
+    const valid = await bcrypt.compare(password, user.rows[0].password);
+
+    if(!valid)
+      return res.status(401).json({message:"Incorrect Password"});
 
     const token = jwt.sign(
-      { email: user.rows[0].email, role: user.rows[0].role },
+      {email:user.rows[0].email, role:user.rows[0].role},
       process.env.JWT_SECRET,
-      { expiresIn: "7d" }
+      {expiresIn:"7d"}
     );
 
     res.json({
-      success: true,
-      message: "Login Successful",
+      success:true,
+      message:"Login Successful",
       token,
-      user: user.rows[0]
+      user:user.rows[0]
     });
 
-  } catch (err) {
-    res.status(500).json({ message: "Server Error", error: err.message });
+  }catch(err){
+    res.status(500).json({message:"Server Error",error:err.message});
   }
 });
 
