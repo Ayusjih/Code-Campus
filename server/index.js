@@ -12,11 +12,15 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+
 // CORS configuration
 app.use(cors({
-  origin: ['https://code-campus-2-r20j.onrender.com', 'http://localhost:5173'],
+  origin: ['https://code-campus-2-r20j.onrender.com', 'http://localhost:5173','https://codecampus.netlify.app'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
 }));
+app.options('*', cors());
 app.use(express.json());
 
 // --- EMAIL TRANSPORTER SETUP ---
@@ -247,14 +251,14 @@ app.post('/api/verify-otp', async (req, res) => {
   }
 });
 
-// 3. REGISTER USER (FIXED & CORRECTED)
+// 3. REGISTER USER (FIXED: This section was broken before)
 app.post('/api/register', async (req, res) => {
     try {
-        console.log("📝 Register Request:", req.body); // Debug log
+        console.log("📝 Register Request:", req.body); // Log request for debugging
 
         // 1. Get data from Frontend
         const { 
-            name, email, password, branch, semester, year, enrollment, // Frontend sends 'enrollment'
+            name, email, password, branch, semester, year, enrollment, 
             leetcode_handle, codeforces_handle, codechef_handle, hackerrank_handle 
         } = req.body;
         
@@ -263,7 +267,7 @@ app.post('/api/register', async (req, res) => {
           return res.status(400).json({ message: "All required fields must be filled" });
         }
 
-        // 3. Check for duplicates (Using 'roll_number' to match DB)
+        // 3. Check for duplicates (Using 'roll_number' to match your DB Schema)
         const userCheck = await pool.query(
             "SELECT * FROM users WHERE email = $1 OR roll_number = $2", 
             [email, enrollment]
@@ -280,8 +284,7 @@ app.post('/api/register', async (req, res) => {
         }
 
         // 4. Insert into Database
-        // Mapping 'enrollment' -> 'roll_number'
-        // Using '_handle' columns
+        // MAPPING: We take 'enrollment' from frontend and save it to 'roll_number' in DB
         const newUser = await pool.query(
             `INSERT INTO users (
                 name, email, password, branch, semester, year, 
@@ -292,7 +295,7 @@ app.post('/api/register', async (req, res) => {
             RETURNING *`,
             [
                 name, email, password, branch, semester, year, 
-                enrollment, 
+                enrollment, // Maps to roll_number
                 leetcode_handle || null, 
                 codeforces_handle || null, 
                 codechef_handle || null, 
