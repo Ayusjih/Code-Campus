@@ -12,15 +12,19 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-
-// CORS configuration
+// CORS configuration (Permissive for development & production)
 app.use(cors({
-  origin: ['https://code-campus-2-r20j.onrender.com', 'http://localhost:5173','https://codeecampus.netlify.app'],
+  origin: [
+    'https://codecampus.netlify.app',          // Production Frontend
+    'https://code-campus-2-r20j.onrender.com', // Production Backend
+    'http://localhost:5173',                   // Local Frontend
+    'http://localhost:5000'                    // Local Backend
+  ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
 }));
-app.options('*', cors());
+
 app.use(express.json());
 
 // --- EMAIL TRANSPORTER SETUP ---
@@ -151,7 +155,7 @@ app.post('/api/send-otp', async (req, res) => {
     console.error('❌ OTP sending error:', err);
     
     // Fallback to console OTP for development
-    if (process.env.NODE_ENV === 'development') {
+    if (process.env.NODE_ENV !== 'production') {
       const otp = Math.floor(100000 + Math.random() * 900000).toString();
       const { email } = req.body;
       
@@ -251,23 +255,22 @@ app.post('/api/verify-otp', async (req, res) => {
   }
 });
 
-// 3. REGISTER USER (FIXED: This section was broken before)
+// 3. REGISTER USER (FIXED: Uses exact columns provided)
 app.post('/api/register', async (req, res) => {
     try {
-        console.log("📝 Register Request:", req.body); // Log request for debugging
+        console.log("📝 Register Request:", req.body); // Log request
 
-        // 1. Get data from Frontend
         const { 
             name, email, password, branch, semester, year, enrollment, 
             leetcode_handle, codeforces_handle, codechef_handle, hackerrank_handle 
         } = req.body;
         
-        // 2. Validate
+        // Validation
         if (!name || !email || !password || !branch || !semester || !year || !enrollment) {
           return res.status(400).json({ message: "All required fields must be filled" });
         }
 
-        // 3. Check for duplicates (Using 'roll_number' to match your DB Schema)
+        // Check for duplicates (Using 'roll_number' to match DB)
         const userCheck = await pool.query(
             "SELECT * FROM users WHERE email = $1 OR roll_number = $2", 
             [email, enrollment]
@@ -283,15 +286,23 @@ app.post('/api/register', async (req, res) => {
             }
         }
 
-        // 4. Insert into Database
-        // MAPPING: We take 'enrollment' from frontend and save it to 'roll_number' in DB
+        // INSERT Query - Updated to match YOUR database columns exactly
         const newUser = await pool.query(
             `INSERT INTO users (
                 name, email, password, branch, semester, year, 
                 roll_number, 
                 leetcode_handle, codeforces_handle, codechef_handle, hackerrank_handle,
-                leetcode_score, codeforces_score, codechef_score, hackerrank_score, total_score
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 0, 0, 0, 0, 0) 
+                -- Initialize scores to 0
+                lc_easy, lc_medium, lc_hard, cf_rating, cc_rating, hackerrank_score, total_score,
+                -- Initialize defaults
+                role, bg_skin, fetch_count, weekly_solved_count
+            ) VALUES (
+                $1, $2, $3, $4, $5, $6, 
+                $7, 
+                $8, $9, $10, $11, 
+                0, 0, 0, 0, 0, 0, 0, 
+                'student', 'gradient-1', 0, 0
+            ) 
             RETURNING *`,
             [
                 name, email, password, branch, semester, year, 
@@ -313,9 +324,10 @@ app.post('/api/register', async (req, res) => {
 
     } catch (err) { 
         console.error('❌ Registration error:', err); 
+        // Send specific error for debugging
         res.status(500).json({ 
             success: false,
-            message: "Server Error during registration", 
+            message: `Server Error: ${err.message}`, 
             error: err.message 
         });
     }
@@ -338,8 +350,13 @@ app.post('/api/login', async (req, res) => {
 app.put('/api/update-profile', async (req, res) => {
     try {
         const { email, leetcode_id, codeforces_id, codechef_id, hackerrank_id, bg_skin } = req.body;
+        // Updated to use both _id and _handle to keep DB consistent if you use both
         const updatedUser = await pool.query(
-            `UPDATE users SET leetcode_id=$1, codeforces_id=$2, codechef_id=$3, hackerrank_id=$4, bg_skin=$5 WHERE email=$6 RETURNING *`,
+            `UPDATE users SET 
+             leetcode_handle=$1, codeforces_handle=$2, codechef_handle=$3, hackerrank_handle=$4, 
+             leetcode_id=$1, codeforces_id=$2, codechef_id=$3, hackerrank_id=$4,
+             bg_skin=$5 
+             WHERE email=$6 RETURNING *`,
             [leetcode_id, codeforces_id, codechef_id, hackerrank_id, bg_skin, email]
         );
         res.json({ message: "Profile Saved!", user: updatedUser.rows[0] });
@@ -366,34 +383,40 @@ app.post('/api/refresh-stats', async (req, res) => {
 
         console.log(`🔄 Refreshing: ${email} (${count + 1}/5)`);
 
+        // Use handles if ids are missing (fallbacks)
+        const lc_user = user.leetcode_handle || user.leetcode_id;
+        const hr_user = user.hackerrank_handle || user.hackerrank_id;
+        const cf_user = user.codeforces_handle || user.codeforces_id;
+        const cc_user = user.codechef_handle || user.codechef_id;
+
         // Fetch All
-        if (user.leetcode_id) {
+        if (lc_user) {
             try {
-                const lc = await fetchLeetCodeStats(user.leetcode_id);
+                const lc = await fetchLeetCodeStats(lc_user);
                 if (lc) await pool.query(`UPDATE users SET lc_easy=$1, lc_medium=$2, lc_hard=$3 WHERE email=$4`, [lc.easy, lc.medium, lc.hard, email]);
             } catch(e) {
                 console.error('LeetCode fetch error:', e);
             }
         }
-        if (user.hackerrank_id) {
+        if (hr_user) {
             try {
-                const hr = await fetchHackerRankStats(user.hackerrank_id);
+                const hr = await fetchHackerRankStats(hr_user);
                 if (hr) await pool.query(`UPDATE users SET hackerrank_score=$1 WHERE email=$2`, [hr.score, email]);
             } catch(e) {
                 console.error('HackerRank fetch error:', e);
             }
         }
-        if (user.codeforces_id) {
+        if (cf_user) {
             try {
-                const cf = await fetchCodeforcesStats(user.codeforces_id);
+                const cf = await fetchCodeforcesStats(cf_user);
                 if (cf) await pool.query(`UPDATE users SET cf_rating=$1 WHERE email=$2`, [cf.rating, email]);
             } catch(e) {
                 console.error('Codeforces fetch error:', e);
             }
         }
-        if (user.codechef_id) {
+        if (cc_user) {
             try {
-                const cc = await fetchCodeChefStats(user.codechef_id);
+                const cc = await fetchCodeChefStats(cc_user);
                 if (cc) await pool.query(`UPDATE users SET cc_rating=$1 WHERE email=$2`, [cc.rating, email]);
             } catch(e) {
                 console.error('CodeChef fetch error:', e);
@@ -419,7 +442,7 @@ app.get('/api/leaderboard', async (req, res) => {
             SELECT name, email, branch, year, semester, role, passout_year, bg_skin,
                    lc_easy, lc_medium, lc_hard, total_score, 
                    cf_rating, cc_rating, hackerrank_score, college_contest_points,
-                   leetcode_id, codeforces_id, codechef_id, hackerrank_id
+                   leetcode_handle, codeforces_handle, codechef_handle, hackerrank_handle
             FROM users ORDER BY total_score DESC
         `);
         res.json(result.rows);
