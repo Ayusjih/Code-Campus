@@ -302,24 +302,24 @@ app.post('/api/register', async (req, res) => {
       codeforces_id,
       codechef_id,
       hackerrank_id,
-      enrollment
+      roll_number
     } = req.body;
 
     // ---------- VALIDATION ----------
-    if (!name || !email || !password || !branch || !semester || !year || !enrollment) {
+    if (!name || !email || !password || !branch || !semester || !year || !roll_number) {
       return res.status(400).json({ message: "All required fields must be filled" });
     }
 
     // Check user exist
     const userCheck = await pool.query(
       "SELECT * FROM users WHERE email = $1 OR roll_number = $2",
-      [email, enrollment]
+      [email, roll_number]
     );
 
     if (userCheck.rows.length > 0) {
       const u = userCheck.rows[0];
       return res.status(401).json({
-        message: u.email === email ? "Email already registered!" : "Enrollment already registered!"
+        message: u.email === email ? "Email already registered!" : "roll_number already registered!"
       });
     }
 
@@ -343,7 +343,7 @@ app.post('/api/register', async (req, res) => {
         codeforces_id || null,
         codechef_id || null,
         hackerrank_id || null,
-        enrollment
+        roll_number
       ]
     );
 
@@ -438,7 +438,7 @@ app.post('/api/register', async (req, res) => {
                    <p style="margin: 5px 0;">• Email: ${email}</p>
                    <p style="margin: 5px 0;">• Branch: ${branch}</p>
                    <p style="margin: 5px 0;">• Year: ${year}</p>
-                   <p style="margin: 5px 0;">• Roll Number: ${enrollment}</p>
+                   <p style="margin: 5px 0;">• Roll Number: ${roll_number}</p>
                  </div>
                </div>
              </div>
