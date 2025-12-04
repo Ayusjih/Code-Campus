@@ -16,24 +16,25 @@ const PORT = process.env.PORT || 5000;
 
 // CORS configuration
 const allowedOrigins = [
-'https://codeecampus.netlify.app',      // Your Netlify frontend
-'http://localhost:5173',               // Local dev frontend
-'https://code-campus-2-r20j.onrender.com' // Your Render backend (self)
+  'https://codeecampus.netlify.app',      // Your Netlify frontend
+  'http://localhost:5173',               // Local dev frontend
+  'https://code-campus-2-r20j.onrender.com' // Your Render backend (self)
 ];
-app.use(cors({
-origin: function (origin, callback) {
-// Allow requests with no origin (like mobile apps or curl)
-if (!origin) return callback(null, true);
 
-if (allowedOrigins.indexOf(origin) !== -1) {
-callback(null, true);
-} else {
-callback(new Error('Not allowed by CORS'));
-}
-},
-credentials: true,
-methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-allowedHeaders: ['Content-Type', 'Authorization', 'Accept']
+app.use(cors({
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl)
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept']
 }));
 
 // Handle preflight requests
@@ -43,25 +44,25 @@ app.use('/api/otp', otpValidator);
 
 // --- EMAIL TRANSPORTER SETUP ---
 const transporter = nodemailer.createTransport({
-host: process.env.EMAIL_HOST || 'smtp.gmail.com',
-port: process.env.EMAIL_PORT || 587,
-secure: false,
-auth: {
-user: process.env.EMAIL_USER,
-pass: process.env.EMAIL_PASS
-},
-tls: {
-rejectUnauthorized: false
-}
+  host: process.env.EMAIL_HOST || 'smtp.gmail.com',
+  port: process.env.EMAIL_PORT || 587,
+  secure: false,
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS
+  },
+  tls: {
+    rejectUnauthorized: false
+  }
 });
 
 // Test email connection
 transporter.verify((error, success) => {
-if (error) {
-console.error('❌ Email server connection failed:', error);
-} else {
-console.log('✅ Email server is ready to send messages');
-}
+  if (error) {
+    console.error('❌ Email server connection failed:', error);
+  } else {
+    console.log('✅ Email server is ready to send messages');
+  }
 });
 
 // --- OTP STORAGE (Temporary - use database in production) ---
@@ -88,51 +89,51 @@ app.get('/', (req, res) => res.send('CodeCampus Server Running...'));
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
-res.json({ status: 'healthy', timestamp: new Date().toISOString() });
+  res.json({ status: 'healthy', timestamp: new Date().toISOString() });
 });
 
 // 1. SEND OTP FOR REGISTRATION
 app.post('/api/send-otp', async (req, res) => {
-try {
-const { email, name = '' } = req.body;
+  try {
+    const { email, name = '' } = req.body;
 
-if (!email) {
-return res.status(400).json({ 
-success: false, 
-message: 'Email is required' 
-});
-}
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email is required'
+      });
+    }
 
-// Check if email already registered
-const userCheck = await pool.query(
-"SELECT email FROM users WHERE email = $1", 
-[email]
-);
+    // Check if email already registered
+    const userCheck = await pool.query(
+      "SELECT email FROM users WHERE email = $1",
+      [email]
+    );
 
-if (userCheck.rows.length > 0) {
-return res.status(400).json({ 
-success: false, 
-message: 'Email already registered. Please login instead.' 
-});
-}
+    if (userCheck.rows.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email already registered. Please login instead.'
+      });
+    }
 
-// Generate 6-digit OTP
-const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    // Generate 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
-// Store OTP with expiration (10 minutes)
-otpStore.set(email, {
-otp,
-timestamp: Date.now(),
-attempts: 0,
-name: name
-});
+    // Store OTP with expiration (10 minutes)
+    otpStore.set(email, {
+      otp,
+      timestamp: Date.now(),
+      attempts: 0,
+      name: name
+    });
 
-// Email HTML template
-const mailOptions = {
-from: '"Code Campus - ITM Gwalior" <noreply@codecampus.com>',
-to: email,
-subject: '🔐 Your OTP for Code Campus Registration',
-html: `
+    // Email HTML template
+    const mailOptions = {
+      from: '"Code Campus - ITM Gwalior" <noreply@codecampus.com>',
+      to: email,
+      subject: '🔐 Your OTP for Code Campus Registration',
+      html: `
        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
          <div style="text-align: center; margin-bottom: 30px;">
            <h1 style="color: #4F46E5; margin: 0;">Code Campus</h1>
@@ -166,177 +167,212 @@ html: `
          </div>
        </div>
      `
-};
+    };
 
-// Send email
-await transporter.sendMail(mailOptions);
+    // Send email
+    await transporter.sendMail(mailOptions);
 
-console.log(`📧 OTP sent to ${email}: ${otp}`);
+    console.log(`📧 OTP sent to ${email}: ${otp}`);
 
-res.json({ 
-success: true, 
-message: 'OTP sent successfully! Check your email.',
-email: email
-});
+    res.json({
+      success: true,
+      message: 'OTP sent successfully! Check your email.',
+      email: email
+    });
 
-} catch (err) {
-console.error('❌ OTP sending error:', err);
+  } catch (err) {
+    console.error('❌ OTP sending error:', err);
 
-// Fallback to console OTP for development
-if (process.env.NODE_ENV === 'development') {
-const otp = Math.floor(100000 + Math.random() * 900000).toString();
-const { email } = req.body;
+    // Fallback to console OTP for development
+    if (process.env.NODE_ENV === 'development') {
+      const otp = Math.floor(100000 + Math.random() * 900000).toString();
+      const { email } = req.body;
 
-if (email) {
-otpStore.set(email, {
-otp,
-timestamp: Date.now(),
-attempts: 0,
-name: req.body.name || ''
-});
+      if (email) {
+        otpStore.set(email, {
+          otp,
+          timestamp: Date.now(),
+          attempts: 0,
+          name: req.body.name || ''
+        });
 
-console.log(`🛠️ DEVELOPMENT MODE - OTP for ${email}: ${otp}`);
+        console.log(`🛠️ DEVELOPMENT MODE - OTP for ${email}: ${otp}`);
 
-return res.json({ 
-success: true, 
-message: 'OTP sent (development mode)',
-email: email,
-development_otp: otp
-});
-}
-}
+        return res.json({
+          success: true,
+          message: 'OTP sent (development mode)',
+          email: email,
+          development_otp: otp
+        });
+      }
+    }
 
-res.status(500).json({ 
-success: false, 
-message: 'Failed to send OTP. Please try again later.' 
-});
-}
+    res.status(500).json({
+      success: false,
+      message: 'Failed to send OTP. Please try again later.'
+    });
+  }
 });
 
 // 2. VERIFY OTP
 app.post('/api/verify-otp', async (req, res) => {
-try {
-const { email, otp } = req.body;
+  try {
+    const { email, otp } = req.body;
 
-if (!email || !otp) {
-return res.status(400).json({ 
-success: false, 
-message: 'Email and OTP are required' 
-});
-}
+    if (!email || !otp) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email and OTP are required'
+      });
+    }
 
-const storedData = otpStore.get(email);
+    const storedData = otpStore.get(email);
 
-if (!storedData) {
-return res.status(400).json({ 
-success: false, 
-message: 'OTP expired or not found. Please request a new one.' 
-});
-}
+    if (!storedData) {
+      return res.status(400).json({
+        success: false,
+        message: 'OTP expired or not found. Please request a new one.'
+      });
+    }
 
-// Check if OTP expired (10 minutes)
-const isExpired = (Date.now() - storedData.timestamp) > 10 * 60 * 1000;
+    // Check if OTP expired (10 minutes)
+    const isExpired = (Date.now() - storedData.timestamp) > 10 * 60 * 1000;
 
-if (isExpired) {
-otpStore.delete(email);
-return res.status(400).json({ 
-success: false, 
-message: 'OTP expired. Please request a new one.' 
-});
-}
+    if (isExpired) {
+      otpStore.delete(email);
+      return res.status(400).json({
+        success: false,
+        message: 'OTP expired. Please request a new one.'
+      });
+    }
 
-// Check OTP attempts
-if (storedData.attempts >= 3) {
-otpStore.delete(email);
-return res.status(400).json({ 
-success: false, 
-message: 'Too many failed attempts. Please request a new OTP.' 
-});
-}
+    // Check OTP attempts
+    if (storedData.attempts >= 3) {
+      otpStore.delete(email);
+      return res.status(400).json({
+        success: false,
+        message: 'Too many failed attempts. Please request a new OTP.'
+      });
+    }
 
-// Verify OTP
-if (storedData.otp !== otp) {
-storedData.attempts += 1;
-otpStore.set(email, storedData);
+    // Verify OTP
+    if (storedData.otp !== otp) {
+      storedData.attempts += 1;
+      otpStore.set(email, storedData);
 
-return res.status(400).json({ 
-success: false, 
-message: `Invalid OTP. ${3 - storedData.attempts} attempts remaining.` 
-});
-}
+      return res.status(400).json({
+        success: false,
+        message: `Invalid OTP. ${3 - storedData.attempts} attempts remaining.`
+      });
+    }
 
-// OTP verified successfully
-otpStore.delete(email);
+    // OTP verified successfully
+    otpStore.delete(email);
 
-res.json({ 
-success: true, 
-message: 'Email verified successfully!',
-verified: true 
-});
+    res.json({
+      success: true,
+      message: 'Email verified successfully!',
+      verified: true
+    });
 
-} catch (err) {
-console.error('❌ OTP verification error:', err);
-res.status(500).json({ 
-success: false, 
-message: 'Failed to verify OTP' 
-});
-}
+  } catch (err) {
+    console.error('❌ OTP verification error:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to verify OTP'
+    });
+  }
 });
 
 // 3. REGISTER USER (after OTP verification)
 app.post('/api/register', async (req, res) => {
-try {
-const { name, email, password, branch, semester, year, leetcode_id, codeforces_id, codechef_id, hackerrank_id, roll_number } = req.body;
+  try {
+    const { name, email, password, branch, semester, year, leetcode_id, codeforces_id, codechef_id, hackerrank_id, enrollment } = req.body;
 
-// Validate required fields
-if (!name || !email || !password || !branch || !semester || !year || !roll_number) {
-return res.status(400).json({ 
-message: "All required fields must be filled" 
-});
-}
+    // ---------- VALIDATION ----------
+    if (!name || !email || !password || !branch || !semester || !year || !enrollment) {
+      return res.status(400).json({ message: "All required fields must be filled" });
+    }
 
-const userCheck = await pool.query("SELECT * FROM users WHERE email = $1 OR roll_number = $2", [email, roll_number]);
-if (userCheck.rows.length > 0) {
-const existingUser = userCheck.rows[0];
-if (existingUser.email === email) {
-return res.status(401).json({ message: "Email already registered!" });
-}
-if (existingUser.roll_number === roll_number) {
-return res.status(401).json({ message: "roll_number number already registered!" });
-}
-}
+    // Check user exist
+    const userCheck = await pool.query(
+      "SELECT * FROM users WHERE email = $1 OR roll_number = $2",
+      [email, enrollment]
+    );
 
-// Insert user into database
-await pool.query(
-`INSERT INTO users (name, email, password, branch, semester, year, leetcode_id, codeforces_id, codechef_id, hackerrank_id, roll_number) 
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-[name, email, password, branch, semester, year, leetcode_id || null, codeforces_id || null, codechef_id || null, hackerrank_id || null, roll_number]
-);
+    if (userCheck.rows.length > 0) {
+      const u = userCheck.rows[0];
+      return res.status(401).json({
+        message: u.email === email ? "Email already registered!" : "Enrollment already registered!"
+      });
+    }
 
-console.log(`✅ New user registered: ${name} (${email})`);
+    // ---------- INSERT USER ----------
+    await pool.query(
+      `INSERT INTO users (name, email, password, branch, semester, year, leetcode_id, codeforces_id, codechef_id, hackerrank_id, roll_number) 
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+      [name, email, password, branch, semester, year, leetcode_id || null, codeforces_id || null, codechef_id || null, hackerrank_id || null, enrollment]
+    );
 
-// Initial Fetch of stats (async - don't wait for it)
-if (leetcode_id) {
-setTimeout(async () => {
-try {
-const lcStats = await fetchLeetCodeStats(leetcode_id);
-if (lcStats) await pool.query(
-`UPDATE users SET lc_easy=$1, lc_medium=$2, lc_hard=$3 WHERE email=$4`, 
-[lcStats.easy, lcStats.medium, lcStats.hard, email]
-);
-} catch(e) {
-console.error('LeetCode initial fetch error:', e);
-}
-}, 1000);
-}
+    // 🚀 RETURN RESPONSE IMMEDIATELY
+    res.json({
+      success: true,
+      message: "Registration Successful! Redirecting...",
+    });
 
-// Send welcome email
-try {
-const welcomeMail = {
-from: '"Code Campus Team" <noreply@codecampus.com>',
-to: email,
-subject: '🎉 Welcome to Code Campus!',
-html: `
+    // ---------------- BACKGROUND STATS + WELCOME EMAIL ----------------
+    (async () => {
+      // 1️⃣ LeetCode
+      if (leetcode_id) {
+        try {
+          const lc = await fetchLeetCodeStats(leetcode_id);
+          if (lc) await pool.query(
+            `UPDATE users SET lc_easy=$1, lc_medium=$2, lc_hard=$3 WHERE email=$4`,
+            [lc.easy, lc.medium, lc.hard, email]
+          );
+        } catch (e) { console.log("LeetCode Fetch Error:", e.message); }
+      }
+
+      // 2️⃣ HackerRank
+      if (hackerrank_id) {
+        try {
+          const hr = await fetchHackerRankStats(hackerrank_id);
+          if (hr) await pool.query(
+            `UPDATE users SET hackerrank_score=$1 WHERE email=$2`,
+            [hr.score, email]
+          );
+        } catch (e) { console.log("HackerRank Fetch Error:", e.message); }
+      }
+
+      // 3️⃣ Codeforces
+      if (codeforces_id) {
+        try {
+          const cf = await fetchCodeforcesStats(codeforces_id);
+          if (cf) await pool.query(
+            `UPDATE users SET cf_rating=$1 WHERE email=$2`,
+            [cf.rating, email]
+          );
+        } catch (e) { console.log("Codeforces Fetch Error:", e.message); }
+      }
+
+      // 4️⃣ CodeChef
+      if (codechef_id) {
+        try {
+          const cc = await fetchCodeChefStats(codechef_id);
+          if (cc) await pool.query(
+            `UPDATE users SET cc_rating=$1 WHERE email=$2`,
+            [cc.rating, email]
+          );
+        } catch (e) { console.log("CodeChef Fetch Error:", e.message); }
+      }
+
+      // 5️⃣ Welcome Email
+      try {
+        const welcomeMail = {
+          from: '"Code Campus Team" <noreply@codecampus.com>',
+          to: email,
+          subject: '🎉 Welcome to Code Campus!',
+          html: `
              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
                <div style="text-align: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
                            padding: 30px; border-radius: 10px 10px 0 0; color: white;">
@@ -353,7 +389,7 @@ html: `
                    <p style="margin: 5px 0;">• Email: ${email}</p>
                    <p style="margin: 5px 0;">• Branch: ${branch}</p>
                    <p style="margin: 5px 0;">• Year: ${year}</p>
-                   <p style="margin: 5px 0;">• roll_number: ${roll_number}</p>
+                   <p style="margin: 5px 0;">• Roll Number: ${enrollment}</p>
                  </div>
                  
                  <p><strong>Next Steps:</strong></p>
@@ -381,181 +417,171 @@ html: `
                </div>
              </div>
            `
-};
+        };
 
-await transporter.sendMail(welcomeMail);
-console.log(`📧 Welcome email sent to ${email}`);
-} catch (emailError) {
-console.log('Welcome email failed (but user registered):', emailError.message);
-}
+        await transporter.sendMail(welcomeMail);
+        console.log(`📧 Welcome email sent to ${email}`);
+      } catch (emailError) {
+        console.log('Welcome email failed (but user registered):', emailError.message);
+      }
 
-// Get final user data
-const finalUser = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
+      console.log("✔ Background Stats Updated for:", email);
+    })();
 
-res.json({ 
-success: true,
-message: "Registration Successful! Welcome to Code Campus.", 
-user: finalUser.rows[0] 
-});
-
-} catch (err) { 
-console.error('❌ Registration error:', err); 
-res.status(500).json({ 
-success: false,
-message: "Server Error during registration", 
-error: process.env.NODE_ENV === 'development' ? err.message : undefined 
-});
-}
+  } catch (err) {
+    console.error('❌ Registration error:', err);
+    res.status(500).json({ message: "Server Error during registration" });
+  }
 });
 
 // 4. LOGIN
 app.post('/api/login', async (req, res) => {
-try {
-const { email, password } = req.body;
-const user = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
-if (user.rows.length === 0) return res.status(401).json({ message: "User not found!" });
-if (password !== user.rows[0].password) return res.status(401).json({ message: "Incorrect Password!" });
-res.json({ message: "Login Successful", user: user.rows[0] });
-} catch (err) { 
-res.status(500).json({ message: "Server Error", error: err.message });
-}
+  try {
+    const { email, password } = req.body;
+    const user = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
+    if (user.rows.length === 0) return res.status(401).json({ message: "User not found!" });
+    if (password !== user.rows[0].password) return res.status(401).json({ message: "Incorrect Password!" });
+    res.json({ message: "Login Successful", user: user.rows[0] });
+  } catch (err) {
+    res.status(500).json({ message: "Server Error", error: err.message });
+  }
 });
 
 // 5. UPDATE PROFILE
 app.put('/api/update-profile', async (req, res) => {
-try {
-const { email, leetcode_id, codeforces_id, codechef_id, hackerrank_id, bg_skin } = req.body;
-const updatedUser = await pool.query(
-`UPDATE users SET leetcode_id=$1, codeforces_id=$2, codechef_id=$3, hackerrank_id=$4, bg_skin=$5 WHERE email=$6 RETURNING *`,
-[leetcode_id, codeforces_id, codechef_id, hackerrank_id, bg_skin, email]
-);
-res.json({ message: "Profile Saved!", user: updatedUser.rows[0] });
-} catch (err) { 
-res.status(500).json({ message: "Server Error", error: err.message });
-}
+  try {
+    const { email, leetcode_id, codeforces_id, codechef_id, hackerrank_id, bg_skin } = req.body;
+    const updatedUser = await pool.query(
+      `UPDATE users SET leetcode_id=$1, codeforces_id=$2, codechef_id=$3, hackerrank_id=$4, bg_skin=$5 WHERE email=$6 RETURNING *`,
+      [leetcode_id, codeforces_id, codechef_id, hackerrank_id, bg_skin, email]
+    );
+    res.json({ message: "Profile Saved!", user: updatedUser.rows[0] });
+  } catch (err) {
+    res.status(500).json({ message: "Server Error", error: err.message });
+  }
 });
 
 // 6. REFRESH STATS
 app.post('/api/refresh-stats', async (req, res) => {
-try {
-const { email } = req.body;
-const userRes = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
-const user = userRes.rows[0];
+  try {
+    const { email } = req.body;
+    const userRes = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
+    const user = userRes.rows[0];
 
-if (!user) return res.status(404).json({ message: "User not found" });
+    if (!user) return res.status(404).json({ message: "User not found" });
 
-// Date Logic
-const today = new Date().toISOString().slice(0, 10);
-const lastDate = user.last_fetched ? new Date(user.last_fetched).toISOString().slice(0, 10) : null;
-let count = (lastDate === today) ? user.fetch_count : 0;
+    // Date Logic
+    const today = new Date().toISOString().slice(0, 10);
+    const lastDate = user.last_fetched ? new Date(user.last_fetched).toISOString().slice(0, 10) : null;
+    let count = (lastDate === today) ? user.fetch_count : 0;
 
-if (count >= 5) return res.status(429).json({ message: "Daily Limit (5/5) Reached! Try tomorrow." });
+    if (count >= 5) return res.status(429).json({ message: "Daily Limit (5/5) Reached! Try tomorrow." });
 
-console.log(`🔄 Refreshing: ${email} (${count + 1}/5)`);
+    console.log(`🔄 Refreshing: ${email} (${count + 1}/5)`);
 
-// Fetch All
-if (user.leetcode_id) {
-try {
-const lc = await fetchLeetCodeStats(user.leetcode_id);
-if (lc) await pool.query(`UPDATE users SET lc_easy=$1, lc_medium=$2, lc_hard=$3 WHERE email=$4`, [lc.easy, lc.medium, lc.hard, email]);
-} catch(e) {
-console.error('LeetCode fetch error:', e);
-}
-}
-if (user.hackerrank_id) {
-try {
-const hr = await fetchHackerRankStats(user.hackerrank_id);
-if (hr) await pool.query(`UPDATE users SET hackerrank_score=$1 WHERE email=$2`, [hr.score, email]);
-} catch(e) {
-console.error('HackerRank fetch error:', e);
-}
-}
-if (user.codeforces_id) {
-try {
-const cf = await fetchCodeforcesStats(user.codeforces_id);
-if (cf) await pool.query(`UPDATE users SET cf_rating=$1 WHERE email=$2`, [cf.rating, email]);
-} catch(e) {
-console.error('Codeforces fetch error:', e);
-}
-}
-if (user.codechef_id) {
-try {
-const cc = await fetchCodeChefStats(user.codechef_id);
-if (cc) await pool.query(`UPDATE users SET cc_rating=$1 WHERE email=$2`, [cc.rating, email]);
-} catch(e) {
-console.error('CodeChef fetch error:', e);
-}
-}
+    // Fetch All
+    if (user.leetcode_id) {
+      try {
+        const lc = await fetchLeetCodeStats(user.leetcode_id);
+        if (lc) await pool.query(`UPDATE users SET lc_easy=$1, lc_medium=$2, lc_hard=$3 WHERE email=$4`, [lc.easy, lc.medium, lc.hard, email]);
+      } catch (e) {
+        console.error('LeetCode fetch error:', e);
+      }
+    }
+    if (user.hackerrank_id) {
+      try {
+        const hr = await fetchHackerRankStats(user.hackerrank_id);
+        if (hr) await pool.query(`UPDATE users SET hackerrank_score=$1 WHERE email=$2`, [hr.score, email]);
+      } catch (e) {
+        console.error('HackerRank fetch error:', e);
+      }
+    }
+    if (user.codeforces_id) {
+      try {
+        const cf = await fetchCodeforcesStats(user.codeforces_id);
+        if (cf) await pool.query(`UPDATE users SET cf_rating=$1 WHERE email=$2`, [cf.rating, email]);
+      } catch (e) {
+        console.error('Codeforces fetch error:', e);
+      }
+    }
+    if (user.codechef_id) {
+      try {
+        const cc = await fetchCodeChefStats(user.codechef_id);
+        if (cc) await pool.query(`UPDATE users SET cc_rating=$1 WHERE email=$2`, [cc.rating, email]);
+      } catch (e) {
+        console.error('CodeChef fetch error:', e);
+      }
+    }
 
-// Update Time, Count & Score
-await pool.query(`UPDATE users SET last_fetched=NOW(), fetch_count=$1 WHERE email=$2`, [count + 1, email]);
-const finalUser = await pool.query(RECALCULATE_SCORE_QUERY, [email]);
+    // Update Time, Count & Score
+    await pool.query(`UPDATE users SET last_fetched=NOW(), fetch_count=$1 WHERE email=$2`, [count + 1, email]);
+    const finalUser = await pool.query(RECALCULATE_SCORE_QUERY, [email]);
 
-res.json({ message: "Stats Refreshed!", user: finalUser.rows[0] });
+    res.json({ message: "Stats Refreshed!", user: finalUser.rows[0] });
 
-} catch (err) {
-console.error(err);
-res.status(500).json({ message: "Server Error", error: err.message });
-}
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server Error", error: err.message });
+  }
 });
 
 // 7. LEADERBOARD
 app.get('/api/leaderboard', async (req, res) => {
-try {
-const result = await pool.query(`
+  try {
+    const result = await pool.query(`
            SELECT name, email, branch, year, semester, role, passout_year, bg_skin,
                   lc_easy, lc_medium, lc_hard, total_score, 
                   cf_rating, cc_rating, hackerrank_score, college_contest_points,
                   leetcode_id, codeforces_id, codechef_id, hackerrank_id
            FROM users ORDER BY total_score DESC
        `);
-res.json(result.rows);
-} catch (err) { 
-res.status(500).json({ message: "Server Error", error: err.message });
-}
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ message: "Server Error", error: err.message });
+  }
 });
 
 // 8. RESEND OTP
 app.post('/api/resend-otp', async (req, res) => {
-try {
-const { email } = req.body;
+  try {
+    const { email } = req.body;
 
-if (!email) {
-return res.status(400).json({ 
-success: false, 
-message: 'Email is required' 
-});
-}
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email is required'
+      });
+    }
 
-// Check if email already registered
-const userCheck = await pool.query(
-"SELECT email FROM users WHERE email = $1", 
-[email]
-);
+    // Check if email already registered
+    const userCheck = await pool.query(
+      "SELECT email FROM users WHERE email = $1",
+      [email]
+    );
 
-if (userCheck.rows.length > 0) {
-return res.status(400).json({ 
-success: false, 
-message: 'Email already registered.' 
-});
-}
+    if (userCheck.rows.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email already registered.'
+      });
+    }
 
-// Generate new OTP
-const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    // Generate new OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
-// Store OTP with expiration
-otpStore.set(email, {
-otp,
-timestamp: Date.now(),
-attempts: 0
-});
+    // Store OTP with expiration
+    otpStore.set(email, {
+      otp,
+      timestamp: Date.now(),
+      attempts: 0
+    });
 
-// Send email
-const mailOptions = {
-from: '"Code Campus" <noreply@codecampus.com>',
-to: email,
-subject: '🔐 New OTP for Code Campus Registration',
-html: `
+    // Send email
+    const mailOptions = {
+      from: '"Code Campus" <noreply@codecampus.com>',
+      to: email,
+      subject: '🔐 New OTP for Code Campus Registration',
+      html: `
        <div style="font-family: Arial, sans-serif; text-align: center; padding: 20px;">
          <h2 style="color: #4F46E5;">New OTP Requested</h2>
          <p>Your new verification code is:</p>
@@ -566,43 +592,43 @@ html: `
          <p>This code expires in 10 minutes.</p>
        </div>
      `
-};
+    };
 
-await transporter.sendMail(mailOptions);
+    await transporter.sendMail(mailOptions);
 
-console.log(`📧 OTP resent to ${email}: ${otp}`);
+    console.log(`📧 OTP resent to ${email}: ${otp}`);
 
-res.json({ 
-success: true, 
-message: 'New OTP sent successfully!' 
-});
+    res.json({
+      success: true,
+      message: 'New OTP sent successfully!'
+    });
 
-} catch (err) {
-console.error('❌ Resend OTP error:', err);
-res.status(500).json({ 
-success: false, 
-message: 'Failed to resend OTP' 
-});
-}
+  } catch (err) {
+    console.error('❌ Resend OTP error:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to resend OTP'
+    });
+  }
 });
 
 // --- AUTOMATION ---
-cron.schedule('0 0 28 2 *', async () => { 
-await pool.query("UPDATE users SET semester = semester + 1 WHERE semester < 8"); 
+cron.schedule('0 0 28 2 *', async () => {
+  await pool.query("UPDATE users SET semester = semester + 1 WHERE semester < 8");
 });
 
-cron.schedule('0 0 31 8 *', async () => { 
-await pool.query("UPDATE users SET semester = semester + 1, year = year + 1 WHERE role = 'student'");
-const currentYear = new Date().getFullYear();
-await pool.query(
-`UPDATE users SET role = 'alumni', passout_year = $1, semester = NULL, year = NULL WHERE semester > 8 AND role = 'student'`, 
-[currentYear]
-);
+cron.schedule('0 0 31 8 *', async () => {
+  await pool.query("UPDATE users SET semester = semester + 1, year = year + 1 WHERE role = 'student'");
+  const currentYear = new Date().getFullYear();
+  await pool.query(
+    `UPDATE users SET role = 'alumni', passout_year = $1, semester = NULL, year = NULL WHERE semester > 8 AND role = 'student'`,
+    [currentYear]
+  );
 });
 
 // Start server
 app.listen(PORT, () => {
-console.log(`✅ Server running on port ${PORT}`);
-console.log(`🌐 Access at: http://localhost:${PORT}`);
-console.log(`📧 Email service: ${transporter.options.auth.user ? 'Configured' : 'Not configured'}`);
+  console.log(`✅ Server running on port ${PORT}`);
+  console.log(`🌐 Access at: http://localhost:${PORT}`);
+  console.log(`📧 Email service: ${transporter.options.auth.user ? 'Configured' : 'Not configured'}`);
 });
