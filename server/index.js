@@ -462,6 +462,36 @@ app.post('/api/register', async (req, res) => {
 
 
 // 4. LOGIN
+// USER LOGIN (PLAINTEXT PASSWORD CHECK)
+app.post('/api/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    const user = await pool.query("SELECT * FROM users WHERE email=$1", [email]);
+
+    if (user.rows.length === 0)
+      return res.status(400).json({ message: "User not found" });
+
+    // 🔥 Plain text compare instead of bcrypt
+    if (password !== user.rows[0].password)
+      return res.status(401).json({ message: "Incorrect Password" });
+
+    const token = jwt.sign(
+      { email: user.rows[0].email, role: user.rows[0].role },
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+
+    res.json({
+      success: true,
+      message: "Login Successful",
+      token,
+      user: user.rows[0]
+    });
+
+  } catch (err) {
+    res.status(500).json({ message: "Server Error", error: err.message });
+  }
+});
 
 
 // USER LOGIN
