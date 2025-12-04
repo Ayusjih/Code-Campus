@@ -286,10 +286,22 @@ app.post('/api/verify-otp', async (req, res) => {
   }
 });
 
-// 3. REGISTER USER (after OTP verification)
+// 3. REGISTER USER (after OTP verification)// 3. REGISTER USER (after OTP verification)
 app.post('/api/register', async (req, res) => {
   try {
-    const { name, email, password, branch, semester, year, leetcode_id, codeforces_id, codechef_id, hackerrank_id, enrollment } = req.body;
+    const {
+      name,
+      email,
+      password,
+      branch,
+      semester,
+      year,
+      leetcode_id,
+      codeforces_id,
+      codechef_id,
+      hackerrank_id,
+      enrollment
+    } = req.body;
 
     // ---------- VALIDATION ----------
     if (!name || !email || !password || !branch || !semester || !year || !enrollment) {
@@ -309,16 +321,29 @@ app.post('/api/register', async (req, res) => {
       });
     }
 
-    
+    // 🔐 hash password before insert  (yaha await bilkul safe hai)
+    const hashedPassword = await bcrypt.hash(password, 10);
 
-// hash password before insert
-const hashedPassword = await bcrypt.hash(password, 10);
-
-await pool.query(
-  `INSERT INTO users (name,email,password,branch,semester,year,leetcode_id,codeforces_id,codechef_id,hackerrank_id,roll_number) 
-   VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
-  [name, email, hashedPassword, branch, semester, year, leetcode_id || null, codeforces_id || null, codechef_id || null, hackerrank_id || null, enrollment]
-);
+    await pool.query(
+      `INSERT INTO users (
+        name, email, password, branch, semester, year,
+        leetcode_id, codeforces_id, codechef_id, hackerrank_id, roll_number
+      )
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+      [
+        name,
+        email,
+        hashedPassword,
+        branch,
+        semester,
+        year,
+        leetcode_id || null,
+        codeforces_id || null,
+        codechef_id || null,
+        hackerrank_id || null,
+        enrollment
+      ]
+    );
 
     // 🚀 RETURN RESPONSE IMMEDIATELY
     res.json({
@@ -332,44 +357,60 @@ await pool.query(
       if (leetcode_id) {
         try {
           const lc = await fetchLeetCodeStats(leetcode_id);
-          if (lc) await pool.query(
-            `UPDATE users SET lc_easy=$1, lc_medium=$2, lc_hard=$3 WHERE email=$4`,
-            [lc.easy, lc.medium, lc.hard, email]
-          );
-        } catch (e) { console.log("LeetCode Fetch Error:", e.message); }
+          if (lc) {
+            await pool.query(
+              `UPDATE users SET lc_easy=$1, lc_medium=$2, lc_hard=$3 WHERE email=$4`,
+              [lc.easy, lc.medium, lc.hard, email]
+            );
+          }
+        } catch (e) {
+          console.log("LeetCode Fetch Error:", e.message);
+        }
       }
 
       // 2️⃣ HackerRank
       if (hackerrank_id) {
         try {
           const hr = await fetchHackerRankStats(hackerrank_id);
-          if (hr) await pool.query(
-            `UPDATE users SET hackerrank_score=$1 WHERE email=$2`,
-            [hr.score, email]
-          );
-        } catch (e) { console.log("HackerRank Fetch Error:", e.message); }
+          if (hr) {
+            await pool.query(
+              `UPDATE users SET hackerrank_score=$1 WHERE email=$2`,
+              [hr.score, email]
+            );
+          }
+        } catch (e) {
+          console.log("HackerRank Fetch Error:", e.message);
+        }
       }
 
       // 3️⃣ Codeforces
       if (codeforces_id) {
         try {
           const cf = await fetchCodeforcesStats(codeforces_id);
-          if (cf) await pool.query(
-            `UPDATE users SET cf_rating=$1 WHERE email=$2`,
-            [cf.rating, email]
-          );
-        } catch (e) { console.log("Codeforces Fetch Error:", e.message); }
+          if (cf) {
+            await pool.query(
+              `UPDATE users SET cf_rating=$1 WHERE email=$2`,
+              [cf.rating, email]
+            );
+          }
+        } catch (e) {
+          console.log("Codeforces Fetch Error:", e.message);
+        }
       }
 
       // 4️⃣ CodeChef
       if (codechef_id) {
         try {
           const cc = await fetchCodeChefStats(codechef_id);
-          if (cc) await pool.query(
-            `UPDATE users SET cc_rating=$1 WHERE email=$2`,
-            [cc.rating, email]
-          );
-        } catch (e) { console.log("CodeChef Fetch Error:", e.message); }
+          if (cc) {
+            await pool.query(
+              `UPDATE users SET cc_rating=$1 WHERE email=$2`,
+              [cc.rating, email]
+            );
+          }
+        } catch (e) {
+          console.log("CodeChef Fetch Error:", e.message);
+        }
       }
 
       // 5️⃣ Welcome Email
@@ -397,29 +438,6 @@ await pool.query(
                    <p style="margin: 5px 0;">• Year: ${year}</p>
                    <p style="margin: 5px 0;">• Roll Number: ${enrollment}</p>
                  </div>
-                 
-                 <p><strong>Next Steps:</strong></p>
-                 <ol style="line-height: 2;">
-                   <li>Connect your coding profiles (LeetCode, Codeforces, etc.)</li>
-                   <li>Start solving problems and tracking progress</li>
-                   <li>Compete on the leaderboard with peers</li>
-                   <li>Analyze your performance with detailed charts</li>
-                 </ol>
-                 
-                 <div style="text-align: center; margin: 30px 0;">
-                   <a href="https://your-frontend-url.com/dashboard" style="background: #4F46E5; color: white; 
-                      padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">
-                     Go to Dashboard →
-                   </a>
-                 </div>
-                 
-                 <p style="color: #666; font-size: 14px; text-align: center;">
-                   Need help? Contact us at support@codecampus.com
-                 </p>
-               </div>
-               
-               <div style="margin-top: 20px; text-align: center; color: #999; font-size: 12px;">
-                 <p>© ${new Date().getFullYear()} Code Campus - ITM Gwalior</p>
                </div>
              </div>
            `
@@ -439,6 +457,7 @@ await pool.query(
     res.status(500).json({ message: "Server Error during registration" });
   }
 });
+
 
 // 4. LOGIN
 
