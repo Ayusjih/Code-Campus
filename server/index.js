@@ -8,11 +8,13 @@ const fetchCodeChefStats = require('./codechefFetcher');
 const cron = require('node-cron');
 const nodemailer = require('nodemailer');
 const otpValidator = require('./otpValidator');
-const bcrypt = require("bcrypt");
+const bcrypt = require("bcryptjs");
 require('dotenv').config();
 const jwt = require("jsonwebtoken");
 const app = express();
 const PORT = process.env.PORT || 5000;
+const hashedPassword = await bcrypt.hash(password, 10);
+const valid = await bcrypt.compare(password,user.rows[0].password);
 
 // CORS configuration
 const allowedOrigins = [
