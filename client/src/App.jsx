@@ -66,9 +66,11 @@ function App() {
 
   // Developer login/logout handlers
   const handleDeveloperLogin = (devUser) => {
-    setDeveloper(devUser);
-    localStorage.setItem('developerToken', devUser.token || 'dev_token');
-  };
+  setDeveloper(devUser);
+  localStorage.setItem('developerToken', devUser.token || 'dev_token');
+  setView('developer-edit'); // redirect to dashboard after login
+};
+
 
   const handleDeveloperLogout = () => {
     setDeveloper(null);
