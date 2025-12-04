@@ -21,7 +21,8 @@ const PORT = process.env.PORT || 5000;
 // CORS configuration
 const allowedOrigins = [
   'https://codeecampus.netlify.app',      // Your Netlify frontend
-  'http://localhost:5173',               // Local dev frontend
+  'http://localhost:5173',    
+ 'https://code-campus-gamma.vercel.app',// Local dev frontend
   'https://code-campus-2-r20j.onrender.com' // Your Render backend (self)
 ];
 
