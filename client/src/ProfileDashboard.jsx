@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
 
+// ✅ LIVE SERVER URL
+const API_BASE = 'https://code-campus-2-r20j.onrender.com';
+
 const ProfileDashboard = ({ user, onBack }) => {
-  const [activeTab, setActiveTab] = useState('view'); // 'view', 'platforms', 'academic'
+  const [activeTab, setActiveTab] = useState('view');
   const [loading, setLoading] = useState(false);
 
-  // Form State
+  // Form State for Profile Update
   const [formData, setFormData] = useState({
     name: user.name || '',
     branch: user.branch || '',
@@ -17,14 +20,22 @@ const ProfileDashboard = ({ user, onBack }) => {
     hackerrank_id: user.hackerrank_id || ''
   });
 
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
+  // Form State for Password Change
+  const [passData, setPassData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
 
+  // Handlers
+  const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
+  const handlePassChange = (e) => setPassData({ ...passData, [e.target.name]: e.target.value });
+
+  // Update Profile Logic
   const handleSave = async () => {
     setLoading(true);
     try {
-      const res = await fetch('http://localhost:5000/api/update-profile', {
+      const res = await fetch(`${API_BASE}/api/update-profile`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: user.email, ...formData })
@@ -36,26 +47,64 @@ const ProfileDashboard = ({ user, onBack }) => {
         localStorage.setItem('codecampus_user', JSON.stringify(updatedUser));
         window.location.reload();
       } else {
-        alert("❌ Update Failed: " + data.message);
+        alert("❌ Update Failed: " + (data.message || "Unknown Error"));
       }
     } catch (err) {
-      alert("❌ Server Error");
+      console.error(err);
+      alert("❌ Connection Failed.");
     } finally {
       setLoading(false);
     }
   };
 
-  // --- STATS CALCULATION FOR CARDS ---
+  // Change Password Logic
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    if (passData.newPassword !== passData.confirmPassword) {
+      alert("❌ New passwords do not match!");
+      return;
+    }
+    if (passData.newPassword.length < 6) {
+      alert("❌ Password must be at least 6 characters long.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/change-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: user.email,
+          currentPassword: passData.currentPassword,
+          newPassword: passData.newPassword
+        })
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        alert("✅ Password Changed Successfully!");
+        setPassData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      } else {
+        alert("❌ Error: " + data.message);
+      }
+    } catch (err) {
+      console.error(err);
+      alert("❌ Server Connection Failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // --- STATS CALCULATION ---
   const lcSolved = (user.lc_easy || 0) + (user.lc_medium || 0) + (user.lc_hard || 0);
   const totalSolved = lcSolved + (user.cf_solved || 0) + (user.cc_solved || 0) + (user.hr_solved || 0);
-  
-  // Helper for progress bars (mock calculation)
   const getProgress = (solved, goal = 500) => Math.min((solved / goal) * 100, 100);
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans text-gray-800 pb-12">
-      
-      {/* --- HEADER --- */}
+      {/* HEADER */}
       <div className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -66,17 +115,17 @@ const ProfileDashboard = ({ user, onBack }) => {
              <h1 className="text-2xl font-bold text-gray-800 hidden md:block ml-4">My Profile</h1>
           </div>
 
-          {/* TAB BUTTONS */}
-          <div className="flex bg-gray-100 p-1 rounded-lg">
+          <div className="flex bg-gray-100 p-1 rounded-lg overflow-x-auto">
             {[
                 { id: 'view', label: 'View Profile' },
                 { id: 'platforms', label: 'Edit Platforms' },
-                { id: 'academic', label: 'Academic Info' }
+                { id: 'academic', label: 'Academic Info' },
+                { id: 'security', label: 'Security' } // 🔥 New Tab
             ].map(tab => (
                 <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`px-4 py-2 text-sm font-bold rounded-md transition-all ${
+                    className={`px-4 py-2 text-sm font-bold rounded-md transition-all whitespace-nowrap ${
                         activeTab === tab.id 
                         ? 'bg-blue-600 text-white shadow-md' 
                         : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200'
@@ -91,11 +140,9 @@ const ProfileDashboard = ({ user, onBack }) => {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-fade-in-up">
         
-        {/* --- 1. VIEW PROFILE TAB --- */}
+        {/* VIEW PROFILE TAB */}
         {activeTab === 'view' && (
           <div className="space-y-8">
-            
-            {/* Identity Card */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 flex flex-col md:flex-row items-center gap-8">
                <div className="h-28 w-28 rounded-full bg-gradient-to-br from-gray-700 to-gray-900 flex items-center justify-center text-4xl font-bold text-white shadow-lg border-4 border-white ring-2 ring-gray-100">
                   {user.name.charAt(0)}
@@ -114,7 +161,6 @@ const ProfileDashboard = ({ user, onBack }) => {
                </div>
             </div>
 
-            {/* Platform Cards Row */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 
                 {/* LeetCode Card */}
@@ -141,10 +187,6 @@ const ProfileDashboard = ({ user, onBack }) => {
                             <div className="flex justify-between text-sm text-gray-600"><span>Medium</span><span className="font-bold">{user.lc_medium || 0}</span></div>
                             <div className="flex justify-between text-sm text-gray-600"><span>Hard</span><span className="font-bold">{user.lc_hard || 0}</span></div>
                         </div>
-
-                        <button className="mt-auto w-full py-2 bg-gray-50 text-gray-600 font-bold text-sm rounded-lg hover:bg-gray-100 transition border border-gray-200">
-                            View Details
-                        </button>
                     </div>
                 </div>
 
@@ -172,10 +214,6 @@ const ProfileDashboard = ({ user, onBack }) => {
                             <div className="flex justify-between text-sm text-gray-600"><span>Stars</span><span className="font-bold text-yellow-500">{user.cc_stars || 'N/A'} ★</span></div>
                             <div className="flex justify-between text-sm text-gray-600"><span>Solved</span><span className="font-bold">{user.cc_solved || 0}</span></div>
                         </div>
-
-                        <button className="mt-auto w-full py-2 bg-gray-50 text-gray-600 font-bold text-sm rounded-lg hover:bg-gray-100 transition border border-gray-200">
-                            View Details
-                        </button>
                     </div>
                 </div>
 
@@ -203,10 +241,6 @@ const ProfileDashboard = ({ user, onBack }) => {
                             <div className="flex justify-between text-sm text-gray-600"><span>Badges</span><span className="font-bold text-gray-400">-</span></div>
                             <div className="flex justify-between text-sm text-gray-600"><span>Solved</span><span className="font-bold">{user.hr_solved || 0}</span></div>
                         </div>
-
-                        <button className="mt-auto w-full py-2 bg-gray-50 text-gray-600 font-bold text-sm rounded-lg hover:bg-gray-100 transition border border-gray-200">
-                            View Details
-                        </button>
                     </div>
                 </div>
 
@@ -214,7 +248,7 @@ const ProfileDashboard = ({ user, onBack }) => {
           </div>
         )}
 
-        {/* --- 2. EDIT PLATFORMS TAB --- */}
+        {/* EDIT PLATFORMS TAB */}
         {activeTab === 'platforms' && (
             <div className="max-w-2xl mx-auto">
                 <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-200">
@@ -247,7 +281,7 @@ const ProfileDashboard = ({ user, onBack }) => {
             </div>
         )}
 
-        {/* --- 3. ACADEMIC INFO TAB --- */}
+        {/* ACADEMIC INFO TAB */}
         {activeTab === 'academic' && (
             <div className="max-w-3xl mx-auto">
                 <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-200">
@@ -294,6 +328,63 @@ const ProfileDashboard = ({ user, onBack }) => {
                             {loading ? 'Saving...' : 'Update Details'}
                         </button>
                     </div>
+                </div>
+            </div>
+        )}
+
+        {/* --- 🔥 NEW SECURITY TAB --- */}
+        {activeTab === 'security' && (
+            <div className="max-w-xl mx-auto">
+                <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-200">
+                    <h3 className="text-xl font-bold text-gray-800 mb-2">Change Password</h3>
+                    <p className="text-gray-500 text-sm mb-6 border-b border-gray-100 pb-4">
+                        Secure your account by updating your password.
+                    </p>
+                    
+                    <form onSubmit={handleChangePassword} className="space-y-5">
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Current Password</label>
+                            <input 
+                                type="password" 
+                                name="currentPassword" 
+                                value={passData.currentPassword} 
+                                onChange={handlePassChange} 
+                                placeholder="Enter current password" 
+                                className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-red-500 outline-none" 
+                                required
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">New Password</label>
+                            <input 
+                                type="password" 
+                                name="newPassword" 
+                                value={passData.newPassword} 
+                                onChange={handlePassChange} 
+                                placeholder="Min. 6 characters" 
+                                className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 outline-none" 
+                                required
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Confirm New Password</label>
+                            <input 
+                                type="password" 
+                                name="confirmPassword" 
+                                value={passData.confirmPassword} 
+                                onChange={handlePassChange} 
+                                placeholder="Re-enter new password" 
+                                className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 outline-none" 
+                                required
+                            />
+                        </div>
+
+                        <div className="mt-8 flex justify-end gap-3">
+                             <button type="submit" disabled={loading} className="bg-gray-800 text-white px-8 py-3 rounded-lg font-bold hover:bg-black transition shadow-lg shadow-gray-200 disabled:opacity-50 flex items-center gap-2">
+                                {loading ? 'Updating...' : 'Change Password'}
+                            </button>
+                        </div>
+                    </form>
                 </div>
             </div>
         )}
