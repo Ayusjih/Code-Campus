@@ -492,29 +492,37 @@ app.post('/api/login', async (req,res)=>{
 
 
 // 4.1 Developer Login
-app.post('/api/developer/login', async (req,res)=>{
-  try{
-    const {email,password} = req.body;
-
-    const result=await pool.query("SELECT * FROM users WHERE email=$1 AND role='developer'",[email]);
-    if(result.rows.length===0) return res.status(403).json({message:"Not Authorized Developer"});
-
-    const user=result.rows[0];
-    const valid=await bcrypt.compare(password,user.password);
-    if(!valid) return res.status(401).json({message:"Wrong Developer Password"});
-
-    const token = jwt.sign(
-      {email:user.email,role:"developer"},
-      process.env.JWT_SECRET,
-      {expiresIn:"7d"}
+// Plaintext developer login - temporary only
+app.post('/api/developer/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    const result = await pool.query(
+      "SELECT * FROM users WHERE email=$1 AND role='developer'",
+      [email]
     );
 
-    return res.json({success:true,message:"Developer Login Successful",token,user});
+    if (result.rows.length === 0) {
+      return res.status(403).json({ message: "Not Authorized Developer" });
+    }
 
-  }catch(err){
-    res.status(500).json({message:"Server Error",error:err.message});
+    const user = result.rows[0];
+    if (user.password !== password) {
+      return res.status(401).json({ message: "Wrong Developer Password" });
+    }
+
+    const token = jwt.sign(
+      { email: user.email, role: "developer" },
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+
+    return res.json({ success: true, message: "Developer Login Successful", token, user });
+  } catch (err) {
+    console.error('Developer login error:', err);
+    res.status(500).json({ message: "Server Error", error: err.message });
   }
 });
+
 
 
 // 5. UPDATE PROFILE
