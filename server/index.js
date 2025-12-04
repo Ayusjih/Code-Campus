@@ -465,30 +465,6 @@ app.post('/api/register', async (req, res) => {
 
 
 // USER LOGIN
-app.post('/api/login', async (req,res)=>{
-  try{
-    const {email,password} = req.body;
-    const user = await pool.query("SELECT * FROM users WHERE email=$1",[email]);
-
-    if(user.rows.length===0) return res.status(400).json({message:"User not found"});
-
-    // This await is correct here because it's inside the async function
-    const valid = await bcrypt.compare(password,user.rows[0].password);
-    if(!valid) return res.status(401).json({message:"Incorrect Password"});
-
-    const token = jwt.sign({email:user.rows[0].email,role:user.rows[0].role},process.env.JWT_SECRET,{expiresIn:"7d"});
-
-    res.json({
-      success:true,
-      message:"Login Successful",
-      token,
-      user:user.rows[0]
-    });
-
-  }catch(err){
-    res.status(500).json({message:"Server Error",error:err.message});
-  }
-});
 
 
 // 4.1 Developer Login
