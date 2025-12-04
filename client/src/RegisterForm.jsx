@@ -148,14 +148,24 @@ const RegisterForm = ({ onSwitchToLogin }) => {
           <h2 className="text-lg font-bold text-indigo-600 border-b pt-4 pb-2 mb-4">Academic Details</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             
-            <select name="branch" value={formData.branch} onChange={handleChange} className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition shadow-sm bg-white" required>
-              <option value="">Branch *</option>
-              <option value="CSE">Computer Science</option>
-              <option value="IT">Information Technology</option>
-              <option value="ECE">Electronics & Communication</option>
-              <option value="ME">Mechanical Engineering</option>
-              <option value="CIVIL">Civil Engineering</option>
-            </select>
+            <select 
+  name="branch" 
+  value={formData.branch} 
+  onChange={handleChange} 
+  className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition shadow-sm bg-white"
+  required
+>
+  <option value="">Branch *</option>
+  <option value="IT">IT</option>
+  <option value="CS">CS</option>
+  <option value="ME">ME</option>
+  <option value="CIVIL">CIVIL</option>
+  <option value="BBA">BBA</option>
+  <option value="IOT">IOT</option>
+  <option value="DS">DS</option>
+  <option value="AIML">AIML</option>
+  <option value="Cyber">Cyber Security</option>
+</select>
             
             <select name="year" value={formData.year} onChange={handleChange} className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition shadow-sm bg-white" required>
               <option value="">Year *</option>
