@@ -15,7 +15,7 @@ const PORT = process.env.PORT || 5000;
 
 // CORS configuration
 app.use(cors({
-  origin: ['https://code-campus-2-r20j.onrender.com', 'http://localhost:5173','https://codecampus.netlify.app'],
+  origin: ['https://code-campus-2-r20j.onrender.com', 'http://localhost:5173','https://codeecampus.netlify.app'],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
