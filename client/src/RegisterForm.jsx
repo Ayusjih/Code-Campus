@@ -5,7 +5,7 @@ const RegisterForm = ({ onSwitchToLogin }) => {
     name: '', 
     email: '', 
     password: '', 
-    enrollment: '',
+    roll_number: '',
     branch: '', 
     semester: '', 
     year: '',
@@ -26,7 +26,7 @@ const RegisterForm = ({ onSwitchToLogin }) => {
     e.preventDefault();
     
     // Basic validation
-    if (!formData.name || !formData.email || !formData.password || !formData.enrollment || !formData.branch || !formData.semester || !formData.year) {
+    if (!formData.name || !formData.email || !formData.password || !formData.roll_number || !formData.branch || !formData.semester || !formData.year) {
       setMessage('❌ Please fill in all required fields');
       return;
     }
@@ -45,7 +45,7 @@ const RegisterForm = ({ onSwitchToLogin }) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...formData,
-          enrollment: formData.enrollment.toUpperCase()
+          roll_number: formData.roll_number.toUpperCase()
         })
       });
       
@@ -124,9 +124,9 @@ const RegisterForm = ({ onSwitchToLogin }) => {
 
             <input 
               type="text" 
-              name="enrollment" 
-              placeholder="Enrollment Number *" 
-              value={formData.enrollment}
+              name="roll_number" 
+              placeholder="roll_number Number *" 
+              value={formData.roll_number}
               onChange={handleChange}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition shadow-sm"
               required 
@@ -212,6 +212,8 @@ const RegisterForm = ({ onSwitchToLogin }) => {
             <input 
               type="text" 
               name="hackerrank_id" 
+
+
               placeholder="HackerRank Username" 
               value={formData.hackerrank_id}
               onChange={handleChange}
