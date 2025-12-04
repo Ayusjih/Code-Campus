@@ -145,7 +145,9 @@ const DeveloperPage = ({ currentUser }) => {
         setIsDeveloper(true);
         setShowLogin(false);
         setLoginError('');
-        window.location.href = '/developer-edit';
+        localStorage.setItem('developerToken', response.data.token);
+window.location.reload(); // App.jsx loads dashboard automatically
+
       }
     } catch (error) {
       setLoginError(error.response?.data?.message || 'Login failed');
