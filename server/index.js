@@ -286,31 +286,31 @@ message: 'Failed to verify OTP'
 // 3. REGISTER USER (after OTP verification)
 app.post('/api/register', async (req, res) => {
 try {
-const { name, email, password, branch, semester, year, leetcode_id, codeforces_id, codechef_id, hackerrank_id, enrollment } = req.body;
+const { name, email, password, branch, semester, year, leetcode_id, codeforces_id, codechef_id, hackerrank_id, roll_number } = req.body;
 
 // Validate required fields
-if (!name || !email || !password || !branch || !semester || !year || !enrollment) {
+if (!name || !email || !password || !branch || !semester || !year || !roll_number) {
 return res.status(400).json({ 
 message: "All required fields must be filled" 
 });
 }
 
-const userCheck = await pool.query("SELECT * FROM users WHERE email = $1 OR enrollment = $2", [email, enrollment]);
+const userCheck = await pool.query("SELECT * FROM users WHERE email = $1 OR roll_number = $2", [email, roll_number]);
 if (userCheck.rows.length > 0) {
 const existingUser = userCheck.rows[0];
 if (existingUser.email === email) {
 return res.status(401).json({ message: "Email already registered!" });
 }
-if (existingUser.enrollment === enrollment) {
-return res.status(401).json({ message: "Enrollment number already registered!" });
+if (existingUser.roll_number === roll_number) {
+return res.status(401).json({ message: "roll_number number already registered!" });
 }
 }
 
 // Insert user into database
 await pool.query(
-`INSERT INTO users (name, email, password, branch, semester, year, leetcode_id, codeforces_id, codechef_id, hackerrank_id, enrollment) 
+`INSERT INTO users (name, email, password, branch, semester, year, leetcode_id, codeforces_id, codechef_id, hackerrank_id, roll_number) 
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-[name, email, password, branch, semester, year, leetcode_id || null, codeforces_id || null, codechef_id || null, hackerrank_id || null, enrollment]
+[name, email, password, branch, semester, year, leetcode_id || null, codeforces_id || null, codechef_id || null, hackerrank_id || null, roll_number]
 );
 
 console.log(`✅ New user registered: ${name} (${email})`);
@@ -353,7 +353,7 @@ html: `
                    <p style="margin: 5px 0;">• Email: ${email}</p>
                    <p style="margin: 5px 0;">• Branch: ${branch}</p>
                    <p style="margin: 5px 0;">• Year: ${year}</p>
-                   <p style="margin: 5px 0;">• Enrollment: ${enrollment}</p>
+                   <p style="margin: 5px 0;">• roll_number: ${roll_number}</p>
                  </div>
                  
                  <p><strong>Next Steps:</strong></p>
