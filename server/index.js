@@ -46,29 +46,45 @@ app.use(express.json());
 app.use('/api/otp', otpValidator);
 
 // --- EMAIL TRANSPORTER SETUP ---
+
+// --- 2. FIXED EMAIL TRANSPORTER (Gmail on Render) ---
 const transporter = nodemailer.createTransport({
+  service: 'gmail', 
   host: 'smtp.gmail.com',
-  port: 465, // CHANGE TO 465
-  secure: true, // CHANGE TO TRUE
+  port: 465,        // 🔥 CHANGE: Force Port 465 (SSL)
+  secure: true,     // 🔥 CHANGE: Must be true for 465
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS
   },
+  // 🔥 CRITICAL NETWORK FIXES FOR RENDER 🔥
   tls: {
-    rejectUnauthorized: false
-  }
+    rejectUnauthorized: false,
+    ciphers: 'SSLv3'
+  },
+  family: 4, // Forces IPv4 (Prevents the 'ETIMEDOUT' error)
+  connectionTimeout: 10000,
+  greetingTimeout: 5000,
+  socketTimeout: 10000
 });
-// Test email connection
+
+// Verify connection on startup
 transporter.verify((error, success) => {
   if (error) {
-    console.error('❌ Email server connection failed:', error);
+    console.error('❌ Email server connection failed:', error.message);
   } else {
-    console.log('✅ Email server is ready to send messages');
+    console.log('✅ Email server is ready (IPv4 Mode)');
   }
 });
 
-// --- OTP STORAGE (Temporary - use database in production) ---
 const otpStore = new Map();
+const RECALCULATE_SCORE_QUERY = `
+   UPDATE users SET total_score = 
+       (COALESCE(lc_easy, 0) * 10) + (COALESCE(lc_medium, 0) * 50) + (COALESCE(lc_hard, 0) * 100) + 
+       (COALESCE(cf_rating, 0) * 1) + (COALESCE(cc_rating, 0) * 1) + (COALESCE(hackerrank_score, 0) * 0.5) + 
+       (COALESCE(college_contest_points, 0))
+   WHERE email = $1 RETURNING *
+`;
 
 // --- HELPER: SCORE FORMULA ---
 const RECALCULATE_SCORE_QUERY = `
@@ -98,123 +114,41 @@ app.get('/api/health', (req, res) => {
 app.post('/api/send-otp', async (req, res) => {
   try {
     const { email, name = '' } = req.body;
+    if (!email) return res.status(400).json({ success: false, message: 'Email required' });
 
-    if (!email) {
-      return res.status(400).json({
-        success: false,
-        message: 'Email is required'
-      });
-    }
+    const userCheck = await pool.query("SELECT email FROM users WHERE email = $1", [email]);
+    if (userCheck.rows.length > 0) return res.status(400).json({ success: false, message: 'Email already registered.' });
 
-    // Check if email already registered
-    const userCheck = await pool.query(
-      "SELECT email FROM users WHERE email = $1",
-      [email]
-    );
-
-    if (userCheck.rows.length > 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Email already registered. Please login instead.'
-      });
-    }
-
-    // Generate 6-digit OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-
-    // Store OTP with verified flag set to FALSE
-    otpStore.set(email, {
-      otp,
-      timestamp: Date.now(),
-      attempts: 0,
-      name: name,
-      verified: false // <--- Important: Initially not verified
+    
+    // Store OTP (Verified = False initially)
+    otpStore.set(email, { 
+        otp, 
+        timestamp: Date.now(), 
+        attempts: 0, 
+        name,
+        verified: false 
     });
 
-    // Email HTML template
-    const mailOptions = {
-      from: '"Code Campus - ITM Gwalior" <noreply@codecampus.com>',
+    await transporter.sendMail({
+      from: '"Code Campus" <noreply@codecampus.com>',
       to: email,
-      subject: '🔐 Your OTP for Code Campus Registration',
+      subject: '🔐 Registration OTP',
       html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
-          <div style="text-align: center; margin-bottom: 30px;">
-            <h1 style="color: #4F46E5; margin: 0;">Code Campus</h1>
-            <p style="color: #666; margin: 5px 0;">ITM Gwalior</p>
-          </div>
-          
-          <h2 style="color: #333;">Hello ${name || 'there'},</h2>
-          <p>Your One-Time Password (OTP) for registration is:</p>
-          
-          <div style="text-align: center; margin: 30px 0;">
-            <div style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
-                        color: white; font-size: 32px; font-weight: bold; letter-spacing: 10px; 
-                        padding: 20px 40px; border-radius: 10px; box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);">
-              ${otp}
-            </div>
-          </div>
-          
-          <p style="color: #666; font-size: 14px;">
-            ⏰ This OTP is valid for <strong>10 minutes</strong>.<br>
-            🔒 Do not share this OTP with anyone.<br>
-            🚀 Enter this code in the registration form to verify your email.
-          </p>
-          
-          <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; text-align: center;">
-            <p style="color: #999; font-size: 12px; margin: 5px 0;">
-              If you didn't request this OTP, please ignore this email.
-            </p>
-            <p style="color: #999; font-size: 12px; margin: 5px 0;">
-              © ${new Date().getFullYear()} Code Campus - ITM Gwalior. All rights reserved.
-            </p>
-          </div>
+        <div style="font-family: Arial, sans-serif; text-align: center; padding: 20px;">
+           <h2 style="color: #4F46E5;">Code Campus Verification</h2>
+           <p>Your OTP is:</p>
+           <h1 style="background: #eee; padding: 10px; display: inline-block; border-radius: 8px;">${otp}</h1>
+           <p>Valid for 10 minutes.</p>
         </div>
       `
-    };
-
-    // Send email
-    await transporter.sendMail(mailOptions);
+    });
 
     console.log(`📧 OTP sent to ${email}: ${otp}`);
-
-    res.json({
-      success: true,
-      message: 'OTP sent successfully! Check your email.',
-      email: email
-    });
-
+    res.json({ success: true, message: 'OTP sent!' });
   } catch (err) {
-    console.error('❌ OTP sending error:', err);
-
-    // Fallback to console OTP for development
-    if (process.env.NODE_ENV === 'development') {
-      const otp = Math.floor(100000 + Math.random() * 900000).toString();
-      const { email } = req.body;
-
-      if (email) {
-        otpStore.set(email, {
-          otp,
-          timestamp: Date.now(),
-          attempts: 0,
-          name: req.body.name || '',
-          verified: false
-        });
-
-        console.log(`🛠️ DEVELOPMENT MODE - OTP for ${email}: ${otp}`);
-
-        return res.json({
-          success: true,
-          message: 'OTP sent (development mode)',
-          email: email,
-          development_otp: otp
-        });
-      }
-    }
-
-    res.status(500).json({
-      success: false,
-      message: 'Failed to send OTP. Please try again later.'
-    });
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Failed to send OTP. Check server logs.' });
   }
 });
 
@@ -222,74 +156,35 @@ app.post('/api/send-otp', async (req, res) => {
 app.post('/api/verify-otp', async (req, res) => {
   try {
     const { email, otp } = req.body;
-
-    if (!email || !otp) {
-      return res.status(400).json({
-        success: false,
-        message: 'Email and OTP are required'
-      });
-    }
-
     const storedData = otpStore.get(email);
 
-    if (!storedData) {
-      return res.status(400).json({
-        success: false,
-        message: 'OTP expired or not found. Please request a new one.'
-      });
-    }
-
-    // Check if OTP expired (10 minutes)
-    const isExpired = (Date.now() - storedData.timestamp) > 10 * 60 * 1000;
-
-    if (isExpired) {
+    if (!storedData) return res.status(400).json({ success: false, message: 'OTP expired or invalid' });
+    
+    if ((Date.now() - storedData.timestamp) > 600000) {
       otpStore.delete(email);
-      return res.status(400).json({
-        success: false,
-        message: 'OTP expired. Please request a new one.'
-      });
+      return res.status(400).json({ success: false, message: 'OTP Expired' });
     }
 
-    // Check OTP attempts
     if (storedData.attempts >= 3) {
       otpStore.delete(email);
-      return res.status(400).json({
-        success: false,
-        message: 'Too many failed attempts. Please request a new OTP.'
-      });
+      return res.status(400).json({ success: false, message: 'Too many attempts.' });
     }
 
-    // Verify OTP
     if (storedData.otp !== otp) {
-      storedData.attempts += 1;
-      otpStore.set(email, storedData);
-
-      return res.status(400).json({
-        success: false,
-        message: `Invalid OTP. ${3 - storedData.attempts} attempts remaining.`
-      });
+        storedData.attempts += 1;
+        otpStore.set(email, storedData);
+        return res.status(400).json({ success: false, message: 'Invalid OTP' });
     }
 
-    // 🔥 MARK AS VERIFIED, BUT DO NOT DELETE YET
-    // We need to keep it so the /register route can check it
+    // Mark as Verified (Do not delete yet)
     storedData.verified = true;
     otpStore.set(email, storedData);
 
-    res.json({
-      success: true,
-      message: 'Email verified successfully!',
-      verified: true
-    });
-
+    res.json({ success: true, message: 'Verified! You can now register.', verified: true });
   } catch (err) {
-    console.error('❌ OTP verification error:', err);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to verify OTP'
-    });
+    res.status(500).json({ success: false, message: 'Error verifying OTP' });
   }
 });
-
 // 3. REGISTER USER (Updated to check verified status)
 app.post('/api/register', async (req, res) => {
   try {
