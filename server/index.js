@@ -47,9 +47,9 @@ app.use('/api/otp', otpValidator);
 
 // --- EMAIL TRANSPORTER SETUP ---
 const transporter = nodemailer.createTransport({
-  host: process.env.EMAIL_HOST || 'smtp.gmail.com',
-  port: process.env.EMAIL_PORT || 587,
-  secure: false,
+  host: 'smtp.gmail.com',
+  port: 465, // CHANGE TO 465
+  secure: true, // CHANGE TO TRUE
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS
@@ -58,7 +58,6 @@ const transporter = nodemailer.createTransport({
     rejectUnauthorized: false
   }
 });
-
 // Test email connection
 transporter.verify((error, success) => {
   if (error) {
