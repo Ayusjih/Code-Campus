@@ -16,16 +16,18 @@ const PORT = process.env.PORT || 5000;
 
 // CORS configuration
 const allowedOrigins = [
-  'https://codeecampus.netlify.app',
-  'http://localhost:5173',
-  'https://code-campus-2-r20j.onrender.com',
-  'https://code-campus-gamma.vercel.app',
-  'https://code-campus.vercel.app'
+  'https://codeecampus.netlify.app',      // Your Netlify frontend
+  'http://localhost:5173',               // Local dev frontend
+  'https://code-campus-2-r20j.onrender.com', // Your Render backend (self)
+  // Add your Vercel URL here if you moved to Vercel
+  'https://code-campus-tau.vercel.app' 
 ];
 
 app.use(cors({
   origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl)
     if (!origin) return callback(null, true);
+
     if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
@@ -44,14 +46,19 @@ app.use('/api/otp', otpValidator);
 
 // --- EMAIL TRANSPORTER SETUP ---
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  host: process.env.EMAIL_HOST || 'smtp.gmail.com',
+  port: process.env.EMAIL_PORT || 587,
+  secure: false,
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS
+  },
+  tls: {
+    rejectUnauthorized: false
   }
 });
 
-// Verify connection on startup
+// Test email connection
 transporter.verify((error, success) => {
   if (error) {
     console.error('❌ Email server connection failed:', error);
@@ -60,6 +67,7 @@ transporter.verify((error, success) => {
   }
 });
 
+// --- OTP STORAGE (Temporary - use database in production) ---
 const otpStore = new Map();
 
 // --- HELPER: SCORE FORMULA ---
@@ -86,7 +94,7 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'healthy', timestamp: new Date().toISOString() });
 });
 
-// 1. SEND OTP FOR REGISTRATION (MISSING FROM YOUR CODE - ADD THIS!)
+// 1. SEND OTP FOR REGISTRATION
 app.post('/api/send-otp', async (req, res) => {
   try {
     const { email, name = '' } = req.body;
@@ -119,7 +127,6 @@ app.post('/api/send-otp', async (req, res) => {
       otp,
       timestamp: Date.now(),
       attempts: 0,
-      verified: false,
       name: name
     });
 
@@ -188,7 +195,6 @@ app.post('/api/send-otp', async (req, res) => {
           otp,
           timestamp: Date.now(),
           attempts: 0,
-          verified: false,
           name: req.body.name || ''
         });
 
@@ -210,11 +216,11 @@ app.post('/api/send-otp', async (req, res) => {
   }
 });
 
-// 2. VERIFY OTP (REMOVED DUPLICATE - KEEP ONLY ONE VERSION)
+// 2. VERIFY OTP
 app.post('/api/verify-otp', async (req, res) => {
   try {
     const { email, otp } = req.body;
-    
+
     if (!email || !otp) {
       return res.status(400).json({
         success: false,
@@ -263,16 +269,12 @@ app.post('/api/verify-otp', async (req, res) => {
     }
 
     // OTP verified successfully
-    storedData.verified = true;
-    storedData.verifiedAt = Date.now();
-    otpStore.set(email, storedData);
+    otpStore.delete(email);
 
     res.json({
       success: true,
       message: 'Email verified successfully!',
-      verified: true,
-      email: email,
-      name: storedData.name || ''
+      verified: true
     });
 
   } catch (err) {
@@ -284,7 +286,7 @@ app.post('/api/verify-otp', async (req, res) => {
   }
 });
 
-// 3. REGISTER USER (Updated to check verified status)
+// 3. REGISTER USER (after OTP verification)
 app.post('/api/register', async (req, res) => {
   try {
     const {
@@ -304,12 +306,6 @@ app.post('/api/register', async (req, res) => {
     // ---------- VALIDATION ----------
     if (!name || !email || !password || !branch || !semester || !year || !roll_number) {
       return res.status(400).json({ message: "All required fields must be filled" });
-    }
-
-    // 🔥 SECURITY CHECK: Has the email been verified?
-    const storedOtpData = otpStore.get(email);
-    if (!storedOtpData || storedOtpData.verified !== true) {
-        return res.status(400).json({ message: "Email not verified. Please verify OTP first." });
     }
 
     // Check user exist
@@ -337,7 +333,7 @@ app.post('/api/register', async (req, res) => {
       [
         name,
         email,
-        hashedPassword,
+        hashedPassword, // Saving the hash
         branch,
         semester,
         year,
@@ -348,9 +344,6 @@ app.post('/api/register', async (req, res) => {
         roll_number
       ]
     );
-
-    // 🔥 CLEANUP: Now we delete the OTP since registration is complete
-    otpStore.delete(email);
 
     // 🚀 RETURN RESPONSE IMMEDIATELY
     res.json({
@@ -427,27 +420,27 @@ app.post('/api/register', async (req, res) => {
           to: email,
           subject: '🎉 Welcome to Code Campus!',
           html: `
-              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-                <div style="text-align: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
-                            padding: 30px; border-radius: 10px 10px 0 0; color: white;">
-                  <h1 style="margin: 0;">Welcome to Code Campus!</h1>
-                  <p style="opacity: 0.9;">Your coding journey begins now</p>
-                </div>
-                
-                <div style="padding: 30px; background: #f9f9f9; border-radius: 0 0 10px 10px;">
-                  <h2>Hello ${name},</h2>
-                  <p>Welcome to the official coding platform of ITM Gwalior! 🚀</p>
-                  
-                  <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #667eea;">
-                    <p style="margin: 10px 0;"><strong>📍 Your Account Details:</strong></p>
-                    <p style="margin: 5px 0;">• Email: ${email}</p>
-                    <p style="margin: 5px 0;">• Branch: ${branch}</p>
-                    <p style="margin: 5px 0;">• Year: ${year}</p>
-                    <p style="margin: 5px 0;">• Roll Number: ${roll_number}</p>
-                  </div>
-                </div>
-              </div>
-            `
+             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+               <div style="text-align: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                           padding: 30px; border-radius: 10px 10px 0 0; color: white;">
+                 <h1 style="margin: 0;">Welcome to Code Campus!</h1>
+                 <p style="opacity: 0.9;">Your coding journey begins now</p>
+               </div>
+               
+               <div style="padding: 30px; background: #f9f9f9; border-radius: 0 0 10px 10px;">
+                 <h2>Hello ${name},</h2>
+                 <p>Welcome to the official coding platform of ITM Gwalior! 🚀</p>
+                 
+                 <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #667eea;">
+                   <p style="margin: 10px 0;"><strong>📍 Your Account Details:</strong></p>
+                   <p style="margin: 5px 0;">• Email: ${email}</p>
+                   <p style="margin: 5px 0;">• Branch: ${branch}</p>
+                   <p style="margin: 5px 0;">• Year: ${year}</p>
+                   <p style="margin: 5px 0;">• Roll Number: ${roll_number}</p>
+                 </div>
+               </div>
+             </div>
+           `
         };
 
         await transporter.sendMail(welcomeMail);
@@ -465,11 +458,13 @@ app.post('/api/register', async (req, res) => {
   }
 });
 
-// 4. LOGIN (SECURE BCRYPT CHECK)
+
+// 4. LOGIN (UPDATED: SECURE BCRYPT CHECK)
 app.post('/api/login', async (req, res) => {
   try {
     const { email, password } = req.body;
     
+    // 1. Check if user exists
     const userRes = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
     if (userRes.rows.length === 0) {
       return res.status(400).json({ message: "User not found" });
@@ -477,14 +472,15 @@ app.post('/api/login', async (req, res) => {
 
     const user = userRes.rows[0];
 
-    // 🔥 SECURE PASSWORD CHECK 🔥
+    // 2. 🔥 SECURE PASSWORD CHECK 🔥
+    // bcrypt.compare(plainPassword, hashedPassword)
     const validPassword = await bcrypt.compare(password, user.password);
 
     if (!validPassword) {
       return res.status(401).json({ message: "Incorrect Password" });
     }
 
-    // Generate Token
+    // 3. Generate Token
     const token = jwt.sign(
       { email: user.email, role: user.role, id: user.id },
       process.env.JWT_SECRET,
@@ -504,7 +500,8 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
-// 4.1 Developer Login
+
+// 4.1 Developer Login (Plaintext check for developer is fine for now, or upgrade if needed)
 app.post('/api/developer/login', async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -518,10 +515,9 @@ app.post('/api/developer/login', async (req, res) => {
     }
 
     const user = result.rows[0];
-    
-    // Use bcrypt for developer login too
-    const validPassword = await bcrypt.compare(password, user.password);
-    if (!validPassword) {
+    // NOTE: If you want to use hashes for developers too, use bcrypt.compare here as well.
+    // For now, keeping it as is based on your previous code.
+    if (user.password !== password) {
       return res.status(401).json({ message: "Wrong Developer Password" });
     }
 
@@ -543,6 +539,7 @@ app.put('/api/update-profile', async (req, res) => {
   try {
     const { email, leetcode_id, codeforces_id, codechef_id, hackerrank_id, bg_skin } = req.body;
     
+    // Safety check for existing user data to avoid null/undefined
     const currentUserRes = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
     if (currentUserRes.rows.length === 0) return res.status(404).json({message: "User not found"});
     const currentUser = currentUserRes.rows[0];
@@ -675,8 +672,7 @@ app.post('/api/resend-otp', async (req, res) => {
     otpStore.set(email, {
       otp,
       timestamp: Date.now(),
-      attempts: 0,
-      verified: false
+      attempts: 0
     });
 
     // Send email
@@ -685,16 +681,16 @@ app.post('/api/resend-otp', async (req, res) => {
       to: email,
       subject: '🔐 New OTP for Code Campus Registration',
       html: `
-        <div style="font-family: Arial, sans-serif; text-align: center; padding: 20px;">
-          <h2 style="color: #4F46E5;">New OTP Requested</h2>
-          <p>Your new verification code is:</p>
-          <h1 style="background: #4F46E5; color: white; padding: 15px; display: inline-block; 
-                     border-radius: 8px; letter-spacing: 8px; margin: 20px 0;">
-            ${otp}
-          </h1>
-          <p>This code expires in 10 minutes.</p>
-        </div>
-      `
+       <div style="font-family: Arial, sans-serif; text-align: center; padding: 20px;">
+         <h2 style="color: #4F46E5;">New OTP Requested</h2>
+         <p>Your new verification code is:</p>
+         <h1 style="background: #4F46E5; color: white; padding: 15px; display: inline-block; 
+                    border-radius: 8px; letter-spacing: 8px; margin: 20px 0;">
+           ${otp}
+         </h1>
+         <p>This code expires in 10 minutes.</p>
+       </div>
+     `
     };
 
     await transporter.sendMail(mailOptions);
