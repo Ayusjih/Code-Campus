@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
@@ -79,54 +78,82 @@ const DeveloperPage = ({ currentUser }) => {
       setDeveloperData(response.data);
     } catch (error) {
       console.error('Error fetching developer data:', error);
-      // Fallback data
+      // Fallback data - UPDATED WITH AYUSH OJHA CV DATA
       setDeveloperData({
         education: [
           {
-            institution: "Madhav Institute of Technology & Science, Gwalior",
-            degree: "B.Tech in Information Technology",
-            duration: "Aug 2023 - Jun 2027",
-            cgpa: "7.5/10",
-            enrollment: "090517231028",
+            institution: "Institute of Technology Management, Gwalior",
+            degree: "B. Tech in Information Technology",
+            duration: "2021 - 2025",
+            cgpa: "7.9/10",
+            enrollment: "ITM Student",
             department: "Information Technology"
+          },
+          {
+            institution: "Miss Hill Higher Secondary School",
+            degree: "Class 12 (CBSE)",
+            duration: "Completed 2023",
+            cgpa: "78%",
+            enrollment: "School Student",
+            department: "Science/Maths"
           }
         ],
         projects: [
           {
-            title: "ITM GOI Platform",
-            description: "Complete web platform development with user authentication and contest management features.",
-            category: "Full Stack",
-            link: "#",
-            dates: "Oct - Dec 2024"
+            title: "Google Cloud GenAI Intern",
+            description: "Completed two virtual internships focusing on Generative AI technologies and Cloud frameworks.",
+            category: "Internship",
+            link: "https://www.linkedin.com/in/ayush-ojha-447048344/",
+            dates: "Jan-Feb & Apr-May 2025"
           },
           {
-            title: "MERN Stack Applications",
-            description: "Multiple projects using MERN stack focusing on modern web technologies and scalable architectures.",
-            category: "Web Development",
-            link: "#",
-            dates: "Jan - Mar 2025"
+            title: "Online Quiz System",
+            description: "Built using Advanced Java (OOPS, JDBC, Servlet, Multithreading) for robust assessment.",
+            category: "Full Stack Java",
+            link: "https://github.com/Ayusjih",
+            dates: "Academic Project"
           },
           {
-            title: "AI Attendance System",
-            description: "Built an Attendance Management System using face recognition technology.",
+            title: "Face Recognition Attendance",
+            description: "Real-time attendance system utilizing computer vision for automated tracking.",
             category: "AI/ML",
-            link: "#",
-            dates: "Nov - Dec 2024"
-          }
+            link: "https://github.com/Ayusjih",
+            dates: "System Design"
+          },
+          {
+            title: "ShuvidaGo",
+            description: "Web-based site for solving legal document problems in India.",
+            category: "Web Development",
+            link: "https://github.com/Ayusjih",
+            dates: "Web Platform"
+          },
+          {
+             title: "Safety Chrome Extension",
+             description: "Browser extension designed for women, elder, and younger safety while web surfing.",
+             category: "Cybersecurity",
+             link: "https://github.com/Ayusjih",
+             dates: "Extension"
+           }
         ],
         achievements: [
-          "Solely created this entire platform from scratch",
-          "Active participant in various coding competitions",
-          "Consistently maintaining good academic performance",
-          "Developing practical web development skills alongside academics",
-          "Certificates from Oxford Home School & Harvard University"
+          "Rank 1 (Winner): Theme Defence in 2nd National Level Hack-Arena Hackathon, GNIT Hyderabad (Team Leader)",
+          "Rank 2: Cybersecurity Hackathon Organised by Police of Gwalior MP (Team Leader)",
+          "Rank 2: IIC Code Competition in ITM college Sithouli Gwalior",
+          "5th Runner Up: 2nd National Level Hack-Arena Hackathon GNIT Hyderabad",
+          "Successfully captained high-performing team in LinguaSkill training program"
         ],
         guidance: [
           {
-            source: "Prof. Anjali Sharma",
-            description: "Assistant Professor, IT Department",
-            email: "faculty@mitsgwl.ac.in",
-            role: "Project Guide"
+            source: "ITM Gwalior Faculty",
+            description: "Institute of Technology Management",
+            email: "admin@itmgwalior.ac.in",
+            role: "Academic Mentors"
+          },
+          {
+            source: "Coding Thinker",
+            description: "Full Stack Java + DSA Institution",
+            email: "info@codingthinker.com",
+            role: "Technical Training"
           }
         ]
       });
@@ -176,13 +203,14 @@ window.location.reload(); // App.jsx loads dashboard automatically
 
   const safeData = developerData || { education: [], projects: [], achievements: [], guidance: [] };
 
+  // UPDATED MAIN DEV DATA FOR AYUSH OJHA
   const mainDev = {
     name: "Ayush Ojha",
-    role: "Full Stack Web Developer",
+    role: "Full Stack Java Developer",
     branch: "Information Technology",
-    email: "090517231028@gmail.com",
-    github: "AyushOjha",
-    linkedin: "ayushojha"
+    email: "Ayushojha992005@gmail.com",
+    github: "Ayusjih",
+    linkedin: "ayush-ojha-447048344"
   };
 
   return (
@@ -192,7 +220,7 @@ window.location.reload(); // App.jsx loads dashboard automatically
       <div className="text-center pt-12 pb-10 px-4 relative">
         <h1 className="text-4xl font-extrabold text-gray-900 mb-3 tracking-tight">Meet the Developer</h1>
         <p className="text-base text-gray-500 max-w-2xl mx-auto leading-relaxed">
-          Passionate about creating intuitive web experiences and solving real-world problems through technology.
+          Aspiring IT professional with a strong academic foundation and a passion for technology, innovation, and problem-solving.
         </p>
 
         {/* Hidden/Developer Controls - Only visible AFTER login */}
@@ -270,14 +298,14 @@ window.location.reload(); // App.jsx loads dashboard automatically
               
               {/* Social Pills */}
               <div className="flex flex-wrap justify-center md:justify-start gap-3">
-                 <a href="#" className="flex items-center gap-2 px-5 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-full text-sm font-semibold backdrop-blur-md border border-white/20 transition-all hover:-translate-y-1">
+                 <a href={`https://github.com/${mainDev.github}`} target="_blank" rel="noreferrer" className="flex items-center gap-2 px-5 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-full text-sm font-semibold backdrop-blur-md border border-white/20 transition-all hover:-translate-y-1">
                     <Icons.Github /> {mainDev.github}
                  </a>
-                 <a href="#" className="flex items-center gap-2 px-5 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-full text-sm font-semibold backdrop-blur-md border border-white/20 transition-all hover:-translate-y-1">
-                    <Icons.Linkedin /> {mainDev.linkedin}
+                 <a href={`https://linkedin.com/in/${mainDev.linkedin}`} target="_blank" rel="noreferrer" className="flex items-center gap-2 px-5 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-full text-sm font-semibold backdrop-blur-md border border-white/20 transition-all hover:-translate-y-1">
+                    <Icons.Linkedin /> LinkedIn
                  </a>
                  <a href={`mailto:${mainDev.email}`} className="flex items-center gap-2 px-5 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-full text-sm font-semibold backdrop-blur-md border border-white/20 transition-all hover:-translate-y-1">
-                    <Icons.Mail /> {mainDev.email}
+                    <Icons.Mail /> Email
                  </a>
               </div>
            </div>
@@ -293,16 +321,16 @@ window.location.reload(); // App.jsx loads dashboard automatically
                <h3 className="font-bold text-xl text-gray-800">Education</h3>
             </div>
             {safeData.education.length > 0 ? safeData.education.map((edu, idx) => (
-              <div key={idx} className="pl-2">
+              <div key={idx} className="pl-2 mb-6 last:mb-0">
                  <h4 className="font-bold text-lg text-gray-900">{edu.institution}</h4>
                  <p className="text-gray-600 font-medium mt-1">{edu.degree}</p>
                  <div className="flex flex-wrap items-center gap-3 mt-4">
                     <span className="text-xs bg-blue-50 text-blue-700 px-3 py-1 rounded-full font-bold border border-blue-100">📅 {edu.duration}</span>
-                    <span className="text-xs bg-green-50 text-green-700 px-3 py-1 rounded-full font-bold border border-green-100">CGPA: {edu.cgpa}</span>
+                    <span className="text-xs bg-green-50 text-green-700 px-3 py-1 rounded-full font-bold border border-green-100">Grade: {edu.cgpa}</span>
                  </div>
                  <div className="mt-4 text-sm text-gray-500 space-y-1 bg-gray-50 p-3 rounded-lg border border-gray-100">
-                    <p><span className="font-bold text-gray-700">Enrollment:</span> {edu.enrollment}</p>
-                    <p><span className="font-bold text-gray-700">Dept:</span> {edu.department}</p>
+                    <p><span className="font-bold text-gray-700">Status:</span> {edu.enrollment}</p>
+                    <p><span className="font-bold text-gray-700">Stream:</span> {edu.department}</p>
                  </div>
               </div>
             )) : <p className="text-gray-400 italic">No education details added.</p>}
@@ -356,8 +384,8 @@ window.location.reload(); // App.jsx loads dashboard automatically
                  <p className="text-sm text-gray-600 mb-6 flex-grow leading-relaxed relative z-10">{proj.description}</p>
                  
                  {proj.link && proj.link !== '#' && (
-                   <a href={proj.link} className="inline-flex items-center text-sm font-bold text-blue-600 hover:text-blue-800 mt-auto border-t border-gray-50 pt-4 w-full group-hover:border-blue-50 transition-colors">
-                     View Project <span className="ml-auto transform group-hover:translate-x-1 transition-transform">→</span>
+                   <a href={proj.link} target="_blank" rel="noreferrer" className="inline-flex items-center text-sm font-bold text-blue-600 hover:text-blue-800 mt-auto border-t border-gray-50 pt-4 w-full group-hover:border-blue-50 transition-colors">
+                     View Details <span className="ml-auto transform group-hover:translate-x-1 transition-transform">→</span>
                    </a>
                  )}
               </div>
