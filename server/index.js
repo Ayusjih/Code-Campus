@@ -20,7 +20,9 @@ const allowedOrigins = [
   'http://localhost:5173',               // Local dev frontend
   'https://code-campus-2-r20j.onrender.com', // Your Render backend (self)
   // Add your Vercel URL here if you moved to Vercel
-  'https://code-campus-gamma.vercel.app/' 
+    'https://code-campus-gamma.vercel.app',
+  'https://code-campus.vercel.app'
+  
 ];
 
 app.use(cors({
