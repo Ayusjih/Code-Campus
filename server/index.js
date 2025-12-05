@@ -16,8 +16,8 @@ const PORT = process.env.PORT || 5000;
 
 // CORS configuration
 const allowedOrigins = [
-  'https://codeecampus.netlify.app',      // Your Netlify frontend
-  'http://localhost:5173',               // Local dev frontend
+  'https://codeecampus.netlify.app',          // Your Netlify frontend
+  'http://localhost:5173',                   // Local dev frontend
   'https://code-campus-2-r20j.onrender.com', // Your Render backend (self)
   // Add your Vercel URL here if you moved to Vercel
   'https://code-campus-gamma.vercel.app',
@@ -123,12 +123,13 @@ app.post('/api/send-otp', async (req, res) => {
     // Generate 6-digit OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
-    // Store OTP with expiration (10 minutes)
+    // Store OTP with verified flag set to FALSE
     otpStore.set(email, {
       otp,
       timestamp: Date.now(),
       attempts: 0,
-      name: name
+      name: name,
+      verified: false // <--- Important: Initially not verified
     });
 
     // Email HTML template
@@ -137,39 +138,39 @@ app.post('/api/send-otp', async (req, res) => {
       to: email,
       subject: '🔐 Your OTP for Code Campus Registration',
       html: `
-       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
-         <div style="text-align: center; margin-bottom: 30px;">
-           <h1 style="color: #4F46E5; margin: 0;">Code Campus</h1>
-           <p style="color: #666; margin: 5px 0;">ITM Gwalior</p>
-         </div>
-         
-         <h2 style="color: #333;">Hello ${name || 'there'},</h2>
-         <p>Your One-Time Password (OTP) for registration is:</p>
-         
-         <div style="text-align: center; margin: 30px 0;">
-           <div style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
-                       color: white; font-size: 32px; font-weight: bold; letter-spacing: 10px; 
-                       padding: 20px 40px; border-radius: 10px; box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);">
-             ${otp}
-           </div>
-         </div>
-         
-         <p style="color: #666; font-size: 14px;">
-           ⏰ This OTP is valid for <strong>10 minutes</strong>.<br>
-           🔒 Do not share this OTP with anyone.<br>
-           🚀 Enter this code in the registration form to verify your email.
-         </p>
-         
-         <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; text-align: center;">
-           <p style="color: #999; font-size: 12px; margin: 5px 0;">
-             If you didn't request this OTP, please ignore this email.
-           </p>
-           <p style="color: #999; font-size: 12px; margin: 5px 0;">
-             © ${new Date().getFullYear()} Code Campus - ITM Gwalior. All rights reserved.
-           </p>
-         </div>
-       </div>
-     `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
+          <div style="text-align: center; margin-bottom: 30px;">
+            <h1 style="color: #4F46E5; margin: 0;">Code Campus</h1>
+            <p style="color: #666; margin: 5px 0;">ITM Gwalior</p>
+          </div>
+          
+          <h2 style="color: #333;">Hello ${name || 'there'},</h2>
+          <p>Your One-Time Password (OTP) for registration is:</p>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <div style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                        color: white; font-size: 32px; font-weight: bold; letter-spacing: 10px; 
+                        padding: 20px 40px; border-radius: 10px; box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);">
+              ${otp}
+            </div>
+          </div>
+          
+          <p style="color: #666; font-size: 14px;">
+            ⏰ This OTP is valid for <strong>10 minutes</strong>.<br>
+            🔒 Do not share this OTP with anyone.<br>
+            🚀 Enter this code in the registration form to verify your email.
+          </p>
+          
+          <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; text-align: center;">
+            <p style="color: #999; font-size: 12px; margin: 5px 0;">
+              If you didn't request this OTP, please ignore this email.
+            </p>
+            <p style="color: #999; font-size: 12px; margin: 5px 0;">
+              © ${new Date().getFullYear()} Code Campus - ITM Gwalior. All rights reserved.
+            </p>
+          </div>
+        </div>
+      `
     };
 
     // Send email
@@ -196,7 +197,8 @@ app.post('/api/send-otp', async (req, res) => {
           otp,
           timestamp: Date.now(),
           attempts: 0,
-          name: req.body.name || ''
+          name: req.body.name || '',
+          verified: false
         });
 
         console.log(`🛠️ DEVELOPMENT MODE - OTP for ${email}: ${otp}`);
@@ -269,8 +271,10 @@ app.post('/api/verify-otp', async (req, res) => {
       });
     }
 
-    // OTP verified successfully
-    otpStore.delete(email);
+    // 🔥 MARK AS VERIFIED, BUT DO NOT DELETE YET
+    // We need to keep it so the /register route can check it
+    storedData.verified = true;
+    otpStore.set(email, storedData);
 
     res.json({
       success: true,
@@ -287,7 +291,7 @@ app.post('/api/verify-otp', async (req, res) => {
   }
 });
 
-// 3. REGISTER USER (after OTP verification)
+// 3. REGISTER USER (Updated to check verified status)
 app.post('/api/register', async (req, res) => {
   try {
     const {
@@ -307,6 +311,12 @@ app.post('/api/register', async (req, res) => {
     // ---------- VALIDATION ----------
     if (!name || !email || !password || !branch || !semester || !year || !roll_number) {
       return res.status(400).json({ message: "All required fields must be filled" });
+    }
+
+    // 🔥 SECURITY CHECK: Has the email been verified?
+    const storedOtpData = otpStore.get(email);
+    if (!storedOtpData || storedOtpData.verified !== true) {
+        return res.status(400).json({ message: "Email not verified. Please verify OTP first." });
     }
 
     // Check user exist
@@ -345,6 +355,9 @@ app.post('/api/register', async (req, res) => {
         roll_number
       ]
     );
+
+    // 🔥 CLEANUP: Now we delete the OTP since registration is complete
+    otpStore.delete(email);
 
     // 🚀 RETURN RESPONSE IMMEDIATELY
     res.json({
@@ -421,27 +434,27 @@ app.post('/api/register', async (req, res) => {
           to: email,
           subject: '🎉 Welcome to Code Campus!',
           html: `
-             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-               <div style="text-align: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
-                           padding: 30px; border-radius: 10px 10px 0 0; color: white;">
-                 <h1 style="margin: 0;">Welcome to Code Campus!</h1>
-                 <p style="opacity: 0.9;">Your coding journey begins now</p>
-               </div>
-               
-               <div style="padding: 30px; background: #f9f9f9; border-radius: 0 0 10px 10px;">
-                 <h2>Hello ${name},</h2>
-                 <p>Welcome to the official coding platform of ITM Gwalior! 🚀</p>
-                 
-                 <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #667eea;">
-                   <p style="margin: 10px 0;"><strong>📍 Your Account Details:</strong></p>
-                   <p style="margin: 5px 0;">• Email: ${email}</p>
-                   <p style="margin: 5px 0;">• Branch: ${branch}</p>
-                   <p style="margin: 5px 0;">• Year: ${year}</p>
-                   <p style="margin: 5px 0;">• Roll Number: ${roll_number}</p>
-                 </div>
-               </div>
-             </div>
-           `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+                <div style="text-align: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                            padding: 30px; border-radius: 10px 10px 0 0; color: white;">
+                  <h1 style="margin: 0;">Welcome to Code Campus!</h1>
+                  <p style="opacity: 0.9;">Your coding journey begins now</p>
+                </div>
+                
+                <div style="padding: 30px; background: #f9f9f9; border-radius: 0 0 10px 10px;">
+                  <h2>Hello ${name},</h2>
+                  <p>Welcome to the official coding platform of ITM Gwalior! 🚀</p>
+                  
+                  <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #667eea;">
+                    <p style="margin: 10px 0;"><strong>📍 Your Account Details:</strong></p>
+                    <p style="margin: 5px 0;">• Email: ${email}</p>
+                    <p style="margin: 5px 0;">• Branch: ${branch}</p>
+                    <p style="margin: 5px 0;">• Year: ${year}</p>
+                    <p style="margin: 5px 0;">• Roll Number: ${roll_number}</p>
+                  </div>
+                </div>
+              </div>
+            `
         };
 
         await transporter.sendMail(welcomeMail);
@@ -673,7 +686,8 @@ app.post('/api/resend-otp', async (req, res) => {
     otpStore.set(email, {
       otp,
       timestamp: Date.now(),
-      attempts: 0
+      attempts: 0,
+      verified: false // Set verified to false on resend
     });
 
     // Send email
@@ -682,16 +696,16 @@ app.post('/api/resend-otp', async (req, res) => {
       to: email,
       subject: '🔐 New OTP for Code Campus Registration',
       html: `
-       <div style="font-family: Arial, sans-serif; text-align: center; padding: 20px;">
-         <h2 style="color: #4F46E5;">New OTP Requested</h2>
-         <p>Your new verification code is:</p>
-         <h1 style="background: #4F46E5; color: white; padding: 15px; display: inline-block; 
-                    border-radius: 8px; letter-spacing: 8px; margin: 20px 0;">
-           ${otp}
-         </h1>
-         <p>This code expires in 10 minutes.</p>
-       </div>
-     `
+        <div style="font-family: Arial, sans-serif; text-align: center; padding: 20px;">
+          <h2 style="color: #4F46E5;">New OTP Requested</h2>
+          <p>Your new verification code is:</p>
+          <h1 style="background: #4F46E5; color: white; padding: 15px; display: inline-block; 
+                     border-radius: 8px; letter-spacing: 8px; margin: 20px 0;">
+            ${otp}
+          </h1>
+          <p>This code expires in 10 minutes.</p>
+        </div>
+      `
     };
 
     await transporter.sendMail(mailOptions);
