@@ -16,19 +16,16 @@ const PORT = process.env.PORT || 5000;
 
 // CORS configuration
 const allowedOrigins = [
-  'https://codeecampus.netlify.app',          // Your Netlify frontend
-  'http://localhost:5173',                   // Local dev frontend
-  'https://code-campus-2-r20j.onrender.com', // Your Render backend (self)
-  // Add your Vercel URL here if you moved to Vercel
+  'https://codeecampus.netlify.app',
+  'http://localhost:5173',
+  'https://code-campus-2-r20j.onrender.com',
   'https://code-campus-gamma.vercel.app',
   'https://code-campus.vercel.app'
 ];
 
 app.use(cors({
   origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl)
     if (!origin) return callback(null, true);
-
     if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
@@ -46,45 +43,24 @@ app.use(express.json());
 app.use('/api/otp', otpValidator);
 
 // --- EMAIL TRANSPORTER SETUP ---
-
-// --- 2. FIXED EMAIL TRANSPORTER (Gmail on Render) ---
 const transporter = nodemailer.createTransport({
-  service: 'gmail', 
-  host: 'smtp.gmail.com',
-  port: 465,        // 🔥 CHANGE: Force Port 465 (SSL)
-  secure: true,     // 🔥 CHANGE: Must be true for 465
+  service: 'gmail',
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS
-  },
-  // 🔥 CRITICAL NETWORK FIXES FOR RENDER 🔥
-  tls: {
-    rejectUnauthorized: false,
-    ciphers: 'SSLv3'
-  },
-  family: 4, // Forces IPv4 (Prevents the 'ETIMEDOUT' error)
-  connectionTimeout: 10000,
-  greetingTimeout: 5000,
-  socketTimeout: 10000
+  }
 });
 
 // Verify connection on startup
 transporter.verify((error, success) => {
   if (error) {
-    console.error('❌ Email server connection failed:', error.message);
+    console.error('❌ Email server connection failed:', error);
   } else {
-    console.log('✅ Email server is ready (IPv4 Mode)');
+    console.log('✅ Email server is ready to send messages');
   }
 });
 
 const otpStore = new Map();
-const RECALCULATE_SCORE_QUERY = `
-   UPDATE users SET total_score = 
-       (COALESCE(lc_easy, 0) * 10) + (COALESCE(lc_medium, 0) * 50) + (COALESCE(lc_hard, 0) * 100) + 
-       (COALESCE(cf_rating, 0) * 1) + (COALESCE(cc_rating, 0) * 1) + (COALESCE(hackerrank_score, 0) * 0.5) + 
-       (COALESCE(college_contest_points, 0))
-   WHERE email = $1 RETURNING *
-`;
 
 // --- HELPER: SCORE FORMULA ---
 const RECALCULATE_SCORE_QUERY = `
@@ -110,81 +86,204 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'healthy', timestamp: new Date().toISOString() });
 });
 
-// 1. SEND OTP FOR REGISTRATION
+// 1. SEND OTP FOR REGISTRATION (MISSING FROM YOUR CODE - ADD THIS!)
 app.post('/api/send-otp', async (req, res) => {
   try {
     const { email, name = '' } = req.body;
-    if (!email) return res.status(400).json({ success: false, message: 'Email required' });
 
-    const userCheck = await pool.query("SELECT email FROM users WHERE email = $1", [email]);
-    if (userCheck.rows.length > 0) return res.status(400).json({ success: false, message: 'Email already registered.' });
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email is required'
+      });
+    }
 
+    // Check if email already registered
+    const userCheck = await pool.query(
+      "SELECT email FROM users WHERE email = $1",
+      [email]
+    );
+
+    if (userCheck.rows.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email already registered. Please login instead.'
+      });
+    }
+
+    // Generate 6-digit OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    
-    // Store OTP (Verified = False initially)
-    otpStore.set(email, { 
-        otp, 
-        timestamp: Date.now(), 
-        attempts: 0, 
-        name,
-        verified: false 
+
+    // Store OTP with expiration (10 minutes)
+    otpStore.set(email, {
+      otp,
+      timestamp: Date.now(),
+      attempts: 0,
+      verified: false,
+      name: name
     });
 
-    await transporter.sendMail({
-      from: '"Code Campus" <noreply@codecampus.com>',
+    // Email HTML template
+    const mailOptions = {
+      from: '"Code Campus - ITM Gwalior" <noreply@codecampus.com>',
       to: email,
-      subject: '🔐 Registration OTP',
+      subject: '🔐 Your OTP for Code Campus Registration',
       html: `
-        <div style="font-family: Arial, sans-serif; text-align: center; padding: 20px;">
-           <h2 style="color: #4F46E5;">Code Campus Verification</h2>
-           <p>Your OTP is:</p>
-           <h1 style="background: #eee; padding: 10px; display: inline-block; border-radius: 8px;">${otp}</h1>
-           <p>Valid for 10 minutes.</p>
-        </div>
-      `
-    });
+       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
+         <div style="text-align: center; margin-bottom: 30px;">
+           <h1 style="color: #4F46E5; margin: 0;">Code Campus</h1>
+           <p style="color: #666; margin: 5px 0;">ITM Gwalior</p>
+         </div>
+         
+         <h2 style="color: #333;">Hello ${name || 'there'},</h2>
+         <p>Your One-Time Password (OTP) for registration is:</p>
+         
+         <div style="text-align: center; margin: 30px 0;">
+           <div style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                       color: white; font-size: 32px; font-weight: bold; letter-spacing: 10px; 
+                       padding: 20px 40px; border-radius: 10px; box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);">
+             ${otp}
+           </div>
+         </div>
+         
+         <p style="color: #666; font-size: 14px;">
+           ⏰ This OTP is valid for <strong>10 minutes</strong>.<br>
+           🔒 Do not share this OTP with anyone.<br>
+           🚀 Enter this code in the registration form to verify your email.
+         </p>
+         
+         <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; text-align: center;">
+           <p style="color: #999; font-size: 12px; margin: 5px 0;">
+             If you didn't request this OTP, please ignore this email.
+           </p>
+           <p style="color: #999; font-size: 12px; margin: 5px 0;">
+             © ${new Date().getFullYear()} Code Campus - ITM Gwalior. All rights reserved.
+           </p>
+         </div>
+       </div>
+     `
+    };
+
+    // Send email
+    await transporter.sendMail(mailOptions);
 
     console.log(`📧 OTP sent to ${email}: ${otp}`);
-    res.json({ success: true, message: 'OTP sent!' });
+
+    res.json({
+      success: true,
+      message: 'OTP sent successfully! Check your email.',
+      email: email
+    });
+
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false, message: 'Failed to send OTP. Check server logs.' });
+    console.error('❌ OTP sending error:', err);
+
+    // Fallback to console OTP for development
+    if (process.env.NODE_ENV === 'development') {
+      const otp = Math.floor(100000 + Math.random() * 900000).toString();
+      const { email } = req.body;
+
+      if (email) {
+        otpStore.set(email, {
+          otp,
+          timestamp: Date.now(),
+          attempts: 0,
+          verified: false,
+          name: req.body.name || ''
+        });
+
+        console.log(`🛠️ DEVELOPMENT MODE - OTP for ${email}: ${otp}`);
+
+        return res.json({
+          success: true,
+          message: 'OTP sent (development mode)',
+          email: email,
+          development_otp: otp
+        });
+      }
+    }
+
+    res.status(500).json({
+      success: false,
+      message: 'Failed to send OTP. Please try again later.'
+    });
   }
 });
 
-// 2. VERIFY OTP
+// 2. VERIFY OTP (REMOVED DUPLICATE - KEEP ONLY ONE VERSION)
 app.post('/api/verify-otp', async (req, res) => {
   try {
     const { email, otp } = req.body;
+    
+    if (!email || !otp) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email and OTP are required'
+      });
+    }
+
     const storedData = otpStore.get(email);
 
-    if (!storedData) return res.status(400).json({ success: false, message: 'OTP expired or invalid' });
-    
-    if ((Date.now() - storedData.timestamp) > 600000) {
-      otpStore.delete(email);
-      return res.status(400).json({ success: false, message: 'OTP Expired' });
+    if (!storedData) {
+      return res.status(400).json({
+        success: false,
+        message: 'OTP expired or not found. Please request a new one.'
+      });
     }
 
+    // Check if OTP expired (10 minutes)
+    const isExpired = (Date.now() - storedData.timestamp) > 10 * 60 * 1000;
+
+    if (isExpired) {
+      otpStore.delete(email);
+      return res.status(400).json({
+        success: false,
+        message: 'OTP expired. Please request a new one.'
+      });
+    }
+
+    // Check OTP attempts
     if (storedData.attempts >= 3) {
       otpStore.delete(email);
-      return res.status(400).json({ success: false, message: 'Too many attempts.' });
+      return res.status(400).json({
+        success: false,
+        message: 'Too many failed attempts. Please request a new OTP.'
+      });
     }
 
+    // Verify OTP
     if (storedData.otp !== otp) {
-        storedData.attempts += 1;
-        otpStore.set(email, storedData);
-        return res.status(400).json({ success: false, message: 'Invalid OTP' });
+      storedData.attempts += 1;
+      otpStore.set(email, storedData);
+
+      return res.status(400).json({
+        success: false,
+        message: `Invalid OTP. ${3 - storedData.attempts} attempts remaining.`
+      });
     }
 
-    // Mark as Verified (Do not delete yet)
+    // OTP verified successfully
     storedData.verified = true;
+    storedData.verifiedAt = Date.now();
     otpStore.set(email, storedData);
 
-    res.json({ success: true, message: 'Verified! You can now register.', verified: true });
+    res.json({
+      success: true,
+      message: 'Email verified successfully!',
+      verified: true,
+      email: email,
+      name: storedData.name || ''
+    });
+
   } catch (err) {
-    res.status(500).json({ success: false, message: 'Error verifying OTP' });
+    console.error('❌ OTP verification error:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to verify OTP'
+    });
   }
 });
+
 // 3. REGISTER USER (Updated to check verified status)
 app.post('/api/register', async (req, res) => {
   try {
@@ -238,7 +337,7 @@ app.post('/api/register', async (req, res) => {
       [
         name,
         email,
-        hashedPassword, // Saving the hash
+        hashedPassword,
         branch,
         semester,
         year,
@@ -366,13 +465,11 @@ app.post('/api/register', async (req, res) => {
   }
 });
 
-
-// 4. LOGIN (UPDATED: SECURE BCRYPT CHECK)
+// 4. LOGIN (SECURE BCRYPT CHECK)
 app.post('/api/login', async (req, res) => {
   try {
     const { email, password } = req.body;
     
-    // 1. Check if user exists
     const userRes = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
     if (userRes.rows.length === 0) {
       return res.status(400).json({ message: "User not found" });
@@ -380,15 +477,14 @@ app.post('/api/login', async (req, res) => {
 
     const user = userRes.rows[0];
 
-    // 2. 🔥 SECURE PASSWORD CHECK 🔥
-    // bcrypt.compare(plainPassword, hashedPassword)
+    // 🔥 SECURE PASSWORD CHECK 🔥
     const validPassword = await bcrypt.compare(password, user.password);
 
     if (!validPassword) {
       return res.status(401).json({ message: "Incorrect Password" });
     }
 
-    // 3. Generate Token
+    // Generate Token
     const token = jwt.sign(
       { email: user.email, role: user.role, id: user.id },
       process.env.JWT_SECRET,
@@ -408,8 +504,7 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
-
-// 4.1 Developer Login (Plaintext check for developer is fine for now, or upgrade if needed)
+// 4.1 Developer Login
 app.post('/api/developer/login', async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -423,9 +518,10 @@ app.post('/api/developer/login', async (req, res) => {
     }
 
     const user = result.rows[0];
-    // NOTE: If you want to use hashes for developers too, use bcrypt.compare here as well.
-    // For now, keeping it as is based on your previous code.
-    if (user.password !== password) {
+    
+    // Use bcrypt for developer login too
+    const validPassword = await bcrypt.compare(password, user.password);
+    if (!validPassword) {
       return res.status(401).json({ message: "Wrong Developer Password" });
     }
 
@@ -447,7 +543,6 @@ app.put('/api/update-profile', async (req, res) => {
   try {
     const { email, leetcode_id, codeforces_id, codechef_id, hackerrank_id, bg_skin } = req.body;
     
-    // Safety check for existing user data to avoid null/undefined
     const currentUserRes = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
     if (currentUserRes.rows.length === 0) return res.status(404).json({message: "User not found"});
     const currentUser = currentUserRes.rows[0];
@@ -581,7 +676,7 @@ app.post('/api/resend-otp', async (req, res) => {
       otp,
       timestamp: Date.now(),
       attempts: 0,
-      verified: false // Set verified to false on resend
+      verified: false
     });
 
     // Send email
