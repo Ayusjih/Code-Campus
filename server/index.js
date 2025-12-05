@@ -14,16 +14,13 @@ const jwt = require("jsonwebtoken");
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// --- DELETED CRASHING LINES HERE (16 & 17) ---
-// The logic for hashing and comparing passwords is already correctly 
-// placed inside your /api/register and /api/login routes below.
-
 // CORS configuration
 const allowedOrigins = [
   'https://codeecampus.netlify.app',      // Your Netlify frontend
-  'http://localhost:5173',    
- 'https://code-campus-gamma.vercel.app',// Local dev frontend
-  'https://code-campus-2-r20j.onrender.com' // Your Render backend (self)
+  'http://localhost:5173',               // Local dev frontend
+  'https://code-campus-2-r20j.onrender.com', // Your Render backend (self)
+  // Add your Vercel URL here if you moved to Vercel
+  'https://code-campus-gamma.vercel.app/' 
 ];
 
 app.use(cors({
@@ -290,7 +287,6 @@ app.post('/api/verify-otp', async (req, res) => {
 });
 
 // 3. REGISTER USER (after OTP verification)
-
 app.post('/api/register', async (req, res) => {
   try {
     const {
@@ -321,11 +317,11 @@ app.post('/api/register', async (req, res) => {
     if (userCheck.rows.length > 0) {
       const u = userCheck.rows[0];
       return res.status(401).json({
-        message: u.email === email ? "Email already registered!" : "roll_number already registered!"
+        message: u.email === email ? "Email already registered!" : "Roll Number already registered!"
       });
     }
 
-    // 🔐 hash password before insert (This is the correct place for await)
+    // 🔐 hash password before insert
     const hashedPassword = await bcrypt.hash(password, 10);
 
     await pool.query(
@@ -337,7 +333,7 @@ app.post('/api/register', async (req, res) => {
       [
         name,
         email,
-        hashedPassword,
+        hashedPassword, // Saving the hash
         branch,
         semester,
         year,
@@ -463,46 +459,49 @@ app.post('/api/register', async (req, res) => {
 });
 
 
-// 4. LOGIN
-// USER LOGIN (PLAINTEXT PASSWORD CHECK// USER LOGIN (BCRYPT SECURE LOGIN)
-app.post('/api/login', async (req,res)=>{
-  try{
-    const {email,password} = req.body;
-    const user = await pool.query("SELECT * FROM users WHERE email=$1",[email]);
+// 4. LOGIN (UPDATED: SECURE BCRYPT CHECK)
+app.post('/api/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    
+    // 1. Check if user exists
+    const userRes = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
+    if (userRes.rows.length === 0) {
+      return res.status(400).json({ message: "User not found" });
+    }
 
-    if(user.rows.length === 0)
-      return res.status(400).json({message:"User not found"});
+    const user = userRes.rows[0];
 
-    // 🔥 Compare entered password with hashed password from DB
-    const valid = await bcrypt.compare(password, user.rows[0].password);
+    // 2. 🔥 SECURE PASSWORD CHECK 🔥
+    // bcrypt.compare(plainPassword, hashedPassword)
+    const validPassword = await bcrypt.compare(password, user.password);
 
-    if(!valid)
-      return res.status(401).json({message:"Incorrect Password"});
+    if (!validPassword) {
+      return res.status(401).json({ message: "Incorrect Password" });
+    }
 
+    // 3. Generate Token
     const token = jwt.sign(
-      {email:user.rows[0].email, role:user.rows[0].role},
+      { email: user.email, role: user.role, id: user.id },
       process.env.JWT_SECRET,
-      {expiresIn:"7d"}
+      { expiresIn: "7d" }
     );
 
     res.json({
-      success:true,
-      message:"Login Successful",
+      success: true,
+      message: "Login Successful",
       token,
-      user:user.rows[0]
+      user
     });
 
-  }catch(err){
-    res.status(500).json({message:"Server Error",error:err.message});
+  } catch (err) {
+    console.error("Login Error:", err);
+    res.status(500).json({ message: "Server Error", error: err.message });
   }
 });
 
 
-// USER LOGIN
-
-
-// 4.1 Developer Login
-// Plaintext developer login - temporary only
+// 4.1 Developer Login (Plaintext check for developer is fine for now, or upgrade if needed)
 app.post('/api/developer/login', async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -516,6 +515,8 @@ app.post('/api/developer/login', async (req, res) => {
     }
 
     const user = result.rows[0];
+    // NOTE: If you want to use hashes for developers too, use bcrypt.compare here as well.
+    // For now, keeping it as is based on your previous code.
     if (user.password !== password) {
       return res.status(401).json({ message: "Wrong Developer Password" });
     }
@@ -533,15 +534,25 @@ app.post('/api/developer/login', async (req, res) => {
   }
 });
 
-
-
 // 5. UPDATE PROFILE
 app.put('/api/update-profile', async (req, res) => {
   try {
     const { email, leetcode_id, codeforces_id, codechef_id, hackerrank_id, bg_skin } = req.body;
+    
+    // Safety check for existing user data to avoid null/undefined
+    const currentUserRes = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
+    if (currentUserRes.rows.length === 0) return res.status(404).json({message: "User not found"});
+    const currentUser = currentUserRes.rows[0];
+
+    const new_lc = leetcode_id !== undefined ? leetcode_id : currentUser.leetcode_id;
+    const new_cf = codeforces_id !== undefined ? codeforces_id : currentUser.codeforces_id;
+    const new_cc = codechef_id !== undefined ? codechef_id : currentUser.codechef_id;
+    const new_hr = hackerrank_id !== undefined ? hackerrank_id : currentUser.hackerrank_id;
+    const new_skin = bg_skin !== undefined ? bg_skin : (currentUser.bg_skin || 'gradient-1');
+
     const updatedUser = await pool.query(
       `UPDATE users SET leetcode_id=$1, codeforces_id=$2, codechef_id=$3, hackerrank_id=$4, bg_skin=$5 WHERE email=$6 RETURNING *`,
-      [leetcode_id, codeforces_id, codechef_id, hackerrank_id, bg_skin, email]
+      [new_lc, new_cf, new_cc, new_hr, new_skin, email]
     );
     res.json({ message: "Profile Saved!", user: updatedUser.rows[0] });
   } catch (err) {
