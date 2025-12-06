@@ -115,7 +115,7 @@ const DeveloperPage = ({ currentUser }) => {
           },
           {
             title: "Face Recognition Attendance",
-            description: "Real-time attendance system utilizing computer vision for automated tracking.",
+            description: "Real-Time attendance system utilizing computer vision for automated tracking.",
             category: "AI/ML",
             link: "https://github.com/Ayusjih",
             dates: "System Design"
