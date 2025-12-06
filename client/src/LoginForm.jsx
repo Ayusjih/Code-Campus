@@ -1,103 +1,134 @@
+// [2025-12-06 21:23] client/src/LoginForm.jsx
+// Description: Login form using Firebase Auth + Backend Sync.
 
-import React, { useState } from 'react';
+import React, { useState } from "react";
+import { useNavigate, Link } from "react-router-dom";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { auth } from "./firebase"; // Configured firebase instance
 
-// API base URL
-const API_BASE = import.meta.env.VITE_API_URL || 'https://code-campus-2-r20j.onrender.com';
+const LoginForm = () => {
+  const [formData, setFormData] = useState({
+    email: "",
+    password: "",
+  });
 
-const LoginForm = ({ onLogin, onSwitchToRegister }) => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [message, setMessage] = useState('');
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
 
-  // --- NOTIFICATION REQUEST ---
-  const requestNotificationPermission = async () => {
-    if (!('Notification' in window)) return;
-    const permission = await Notification.requestPermission();
-    if (permission === 'granted') {
-      new Notification("Welcome back!", {
-        body: "You have successfully logged in to Code-Campus.",
-        icon: "/vite.svg"
-      });
-    }
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError("");
     setLoading(true);
-    setMessage('');
-    
+
     try {
-      const res = await fetch(`${API_BASE}/api/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
+      // 1. Firebase se Login karo
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        formData.email,
+        formData.password
+      );
+      const user = userCredential.user;
+
+      // 2. User ka Token nikalo (Backend verification ke liye)
+      const token = await user.getIdToken();
+
+      // 3. Backend check karo (Ki user Database me hai ya nahi)
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}` // Token header me bhej rahe hain
+        },
       });
-      
-      const data = await res.json();
-      
-      if (res.ok) {
-        await requestNotificationPermission();
-        onLogin(data.user);
-      } else {
-        setMessage(`❌ ${data.message}`);
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        // Agar Backend bole "User not found", toh error dikhao
+        throw new Error(data.message || "Login failed on server");
       }
+
+      // 4. Success! Data save karo aur Dashboard jao
+      localStorage.setItem("user", JSON.stringify(data.user));
+      navigate("/dashboard");
+
     } catch (err) {
-      setMessage('❌ Server connection failed');
+      console.error("Login Error:", err);
+      // Firebase specific errors ko user-friendly banao
+      if (err.code === "auth/invalid-credential" || err.code === "auth/user-not-found") {
+        setError("Invalid Email or Password.");
+      } else {
+        setError(err.message);
+      }
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-700 to-purple-800 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-10 border border-gray-200">
-        
-        <div className="text-center mb-8">
-          <div className="mx-auto w-14 h-14 bg-indigo-600 rounded-full flex items-center justify-center text-white text-3xl font-extrabold mb-4 shadow-lg">C</div>
-          <h1 className="text-3xl font-extrabold text-gray-800 mb-2">Welcome Back</h1>
-          <p className="text-gray-500">Sign in to continue your progress</p>
-        </div>
+    <div className="flex justify-center items-center min-h-screen bg-gray-100 p-4">
+      <form
+        onSubmit={handleSubmit}
+        className="bg-white p-8 rounded-lg shadow-lg w-full max-w-md"
+      >
+        <h2 className="text-2xl font-bold mb-6 text-center text-blue-600">
+          Welcome Back
+        </h2>
 
-        {/* GOOGLE LOGIN BUTTON (DISABLED + TOOLTIP) */}
-        <div className="relative group mb-6">
-            <button 
-              type="button"
-              disabled
-              className="w-full bg-gray-50 border-2 border-gray-200 text-gray-400 font-bold py-3.5 rounded-xl cursor-not-allowed flex justify-center items-center gap-3 transition select-none opacity-70"
-            >
-              <img src="https://www.svgrepo.com/show/475656/google-color.svg" className="w-5 h-5 opacity-50 grayscale" alt="Google" />
-              Continue with Google
-            </button>
-            
-            {/* HOVER TOOLTIP */}
-            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1.5 bg-gray-800 text-white text-xs font-medium rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap pointer-events-none shadow-lg z-10">
-                under Contruction
-                {/* Arrow */}
-                <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-800"></div>
-            </div>
-        </div>
+        {error && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-2 rounded mb-4 text-sm">
+            {error}
+          </div>
+        )}
 
-        <div className="relative mb-6 text-center">
-            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-200"></div></div>
-            <span className="relative bg-white px-3 text-sm text-gray-400 font-medium">OR LOGIN WITH EMAIL</span>
-        </div>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-gray-700 text-sm font-bold mb-2">Email</label>
+            <input
+              type="email"
+              name="email"
+              placeholder="college@email.com"
+              onChange={handleChange}
+              required
+              className="w-full px-3 py-2 border rounded shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
 
-        {message && <div className="p-3 bg-red-50 text-red-600 text-center rounded-lg mb-6 border border-red-100 font-medium">{message}</div>}
+          <div>
+            <label className="block text-gray-700 text-sm font-bold mb-2">Password</label>
+            <input
+              type="password"
+              name="password"
+              placeholder="********"
+              onChange={handleChange}
+              required
+              className="w-full px-3 py-2 border rounded shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <input type="email" placeholder="Email address" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full px-4 py-3.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 transition" required />
-          <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full px-4 py-3.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 transition" required />
-
-          <button type="submit" disabled={loading} className="w-full bg-indigo-600 text-white font-bold py-3.5 rounded-xl hover:bg-indigo-700 transition shadow-lg shadow-indigo-200">
-            {loading ? 'Signing in...' : 'Sign In'}
+          <button
+            type="submit"
+            disabled={loading}
+            className={`w-full bg-blue-600 text-white font-bold py-2 px-4 rounded hover:bg-blue-700 transition duration-300 ${loading ? "opacity-50 cursor-not-allowed" : ""}`}
+          >
+            {loading ? "Logging in..." : "Login"}
           </button>
-        </form>
-
-        <div className="text-center mt-8">
-          <p className="text-gray-600">Don't have an account? <button onClick={onSwitchToRegister} className="text-indigo-600 font-bold hover:underline">Register now</button></p>
         </div>
-      </div>
+
+        <div className="mt-4 text-center">
+          <p className="text-sm text-gray-600">
+            Don't have an account?{" "}
+            <Link to="/register" className="text-blue-600 hover:underline">
+              Register here
+            </Link>
+          </p>
+        </div>
+      </form>
     </div>
   );
 };
