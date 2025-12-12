@@ -1,4 +1,4 @@
-import React, { Suspense, lazy } from 'react';
+import React, { useEffect,Suspense, lazy } from 'react';
 import { Routes, Route, Navigate } from "react-router-dom";
 
 // --- STATIC IMPORTS (Core components needed immediately) ---
@@ -34,6 +34,10 @@ const LoadingFallback = () => (
 );
 
 const App = () => {
+  useEffect(() => {
+    document.title = "CodeCampus";
+  }, []);
+
   return (
     <div className="app-container font-sans text-gray-900 bg-gray-50 min-h-screen">
       
