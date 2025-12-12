@@ -7,6 +7,8 @@ import PrivateRoute from "./components/PrivateRoute";
 import TeacherRoute from "./components/TeacherRoute";
 import Home from "./pages/Home"; // Keep Home static for fast first load
 
+
+
 // --- LAZY IMPORTS (Pages loaded on demand) ---
 // This splits the code bundle, making the initial load much faster
 const Login = lazy(() => import("./pages/Login"));

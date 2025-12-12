@@ -15,7 +15,7 @@ const Icons = {
 };
 
 // --- API BASE (Use local for development) ---
-const API_BASE_URL = 'http://localhost:5000'; // Corrected API base
+const API_BASE_URL = 'https://code-campus-v3.onrender.com'; // Corrected API base
 
 const DeveloperDashboard = () => {
   const navigate = useNavigate();

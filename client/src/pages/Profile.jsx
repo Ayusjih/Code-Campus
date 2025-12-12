@@ -69,7 +69,7 @@ const Profile = () => {
       const user = auth.currentUser;
       if (!user) return;
       try {
-        const res = await axios.get(`http://localhost:5000/api/platforms/profile/${user.uid}`);
+        const res = await axios.get(`/api/platforms/profile/${user.uid}`);
         setData(res.data);
         setLoading(false);
       } catch (err) {

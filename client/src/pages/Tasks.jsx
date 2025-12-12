@@ -11,7 +11,7 @@ const Tasks = () => {
   useEffect(() => {
     const fetchTasks = async () => {
         try {
-            const res = await axios.get(`http://localhost:5000/api/tasks/list/${auth.currentUser.uid}`);
+            const res = await axios.get(`/api/tasks/list/${auth.currentUser.uid}`);
             setTasks(res.data);
         } catch (err) { console.error(err); }
     };
@@ -20,7 +20,7 @@ const Tasks = () => {
 
   const handleSubmit = async () => {
     try {
-        await axios.post('http://localhost:5000/api/tasks/submit', {
+        await axios.post('/api/tasks/submit', {
             firebase_uid: auth.currentUser.uid,
             task_id: selectedTask.id,
             code: code

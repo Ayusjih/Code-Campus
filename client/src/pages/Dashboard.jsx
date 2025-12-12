@@ -67,8 +67,8 @@ const Dashboard = () => {
   const fetchDashboardData = async (uid) => {
     try {
       const [platformRes, statsRes] = await Promise.all([
-        axios.get(`http://localhost:5000/api/platforms/${uid}`),
-        axios.get(`http://localhost:5000/api/platforms/stats/${uid}`)
+        axios.get(`/api/platforms/${uid}`),
+        axios.get(`/api/platforms/stats/${uid}`)
       ]);
 
       setPlatforms(platformRes.data);
@@ -85,7 +85,7 @@ const Dashboard = () => {
     if (!usernameInput) return;
     setConnecting(true);
     try {
-      await axios.post('http://localhost:5000/api/platforms/connect', {
+      await axios.post('/api/platforms/connect', {
         firebase_uid: user.uid,
         platform: platformName,
         username: usernameInput
@@ -106,7 +106,7 @@ const Dashboard = () => {
   const handleSync = async () => {
     setIsSyncing(true);
     try {
-        const res = await axios.post('http://localhost:5000/api/platforms/sync', {
+        const res = await axios.post('/api/platforms/sync', {
             firebase_uid: user.uid
         });
         

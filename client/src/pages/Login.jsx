@@ -20,7 +20,7 @@ const Login = () => {
   // Function to sync Google users with Backend
   const syncGoogleUser = async (user) => {
     try {
-      await axios.post("http://localhost:5000/api/users/sync", {
+      await axios.post("/api/users/sync", {
         firebase_uid: user.uid,
         email: user.email,
         full_name: user.displayName,

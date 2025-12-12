@@ -45,7 +45,7 @@ const Register = () => {
       await sendEmailVerification(user);
       await updateProfile(user, { displayName: formData.fullName });
 
-      await axios.post("http://localhost:5000/api/users/sync", {
+      await axios.post("/api/users/sync", {
         firebase_uid: user.uid,
         email: user.email,
         full_name: formData.fullName,
@@ -66,7 +66,7 @@ const Register = () => {
       for (const p of platforms) {
         if (p.handle) {
           try {
-            await axios.post("http://localhost:5000/api/platforms/connect", {
+            await axios.post("/api/platforms/connect", {
                 firebase_uid: user.uid,
                 platform: p.name,
                 username: p.handle

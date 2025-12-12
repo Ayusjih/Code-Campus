@@ -30,17 +30,17 @@ const EditProfile = () => {
         const uid = user.uid;
 
         // 1. Fetch User Role
-        const roleRes = await axios.get(`http://localhost:5000/api/platforms/role/${uid}`);
+        const roleRes = await axios.get(`/api/platforms/role/${uid}`);
         setRole(roleRes.data.role);
 
         // 2. If Teacher, Fetch Visibility Status
         if (roleRes.data.role === 'teacher') {
-            const visRes = await axios.get(`http://localhost:5000/api/platforms/visibility/${uid}`);
+            const visRes = await axios.get(`/api/platforms/visibility/${uid}`);
             setIsHidden(visRes.data.is_hidden);
         }
 
         // 3. Fetch Current Platform Handles
-        const res = await axios.get(`http://localhost:5000/api/platforms/${uid}`);
+        const res = await axios.get(`/api/platforms/${uid}`);
         const currentData = { ...formData };
         
         res.data.forEach(p => {
@@ -72,7 +72,7 @@ const EditProfile = () => {
     try {
         const newState = !isHidden;
         setIsHidden(newState); // Optimistic UI update
-        await axios.post(`http://localhost:5000/api/platforms/visibility`, {
+        await axios.post(`/api/platforms/visibility`, {
             firebase_uid: auth.currentUser.uid,
             is_hidden: newState
         });
@@ -92,7 +92,7 @@ const EditProfile = () => {
 
     try {
       // Send the data to the backend
-      const response = await axios.put('http://localhost:5000/api/platforms/update-handles', {
+      const response = await axios.put('/api/platforms/update-handles', {
         firebase_uid: user.uid,
         profiles: formData
       });

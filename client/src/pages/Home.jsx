@@ -18,7 +18,7 @@ const Home = () => {
   }, [auth]);
 
   useEffect(() => {
-    axios.get('http://localhost:5000/api/platforms/leaderboard')
+    axios.get('/api/platforms/leaderboard')
       .then(res => {
         const data = res.data.leaderboard || [];
         setTopPerformers(data.slice(0, 5));

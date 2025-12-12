@@ -113,7 +113,7 @@ const Leaderboard = () => {
         });
 
         // Fetch Data
-        axios.get('http://localhost:5000/api/platforms/leaderboard')
+        axios.get('/api/platforms/leaderboard')
             .then(res => {
                 const data = res.data.leaderboard || [];
                 setUsers(data);

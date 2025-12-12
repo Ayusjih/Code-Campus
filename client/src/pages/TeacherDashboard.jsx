@@ -15,7 +15,7 @@ const TeacherDashboard = () => {
     e.preventDefault();
     setIsLoading(true);
     try {
-      await axios.post('http://localhost:5000/api/tasks/create', {
+      await axios.post('/api/tasks/create', {
         firebase_uid: auth.currentUser.uid,
         ...formData
       });
@@ -31,7 +31,7 @@ const TeacherDashboard = () => {
   const fetchSubmissions = async () => {
     setIsLoading(true);
     try {
-      const res = await axios.get(`http://localhost:5000/api/tasks/submissions/${auth.currentUser.uid}`);
+      const res = await axios.get(`/api/tasks/submissions/${auth.currentUser.uid}`);
       setSubmissions(res.data);
     } catch (err) {
       console.error(err);

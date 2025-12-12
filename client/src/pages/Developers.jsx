@@ -31,7 +31,7 @@ const Developers = () => {
   const [isDeveloper, setIsDeveloper] = useState(false);
 
   // --- API Base for local development login ---
-  const API_BASE_URL = 'http://localhost:5000'; // Use local API base for developer auth
+  const API_BASE_URL = 'https://code-campus-v3.onrender.com'; // Use local API base for developer auth
 
   useEffect(() => {
     // Check for existing token (Dev Access Status)

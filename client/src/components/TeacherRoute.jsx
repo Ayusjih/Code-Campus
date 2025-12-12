@@ -12,7 +12,7 @@ const TeacherRoute = ({ children }) => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         try {
-          const res = await axios.get(`http://localhost:5000/api/platforms/role/${user.uid}`);
+          const res = await axios.get(`/api/platforms/role/${user.uid}`);
           console.log("Frontend Role Check:", res.data.role); // Debug Log
           
           if (res.data.role === 'teacher') {
