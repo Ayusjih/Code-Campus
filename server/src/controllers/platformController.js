@@ -1,6 +1,11 @@
 const db = require('../config/db');
 const NodeCache = require('node-cache');
-const myCache = new NodeCache({ stdTTL: 300 });
+
+// --- GLOBAL CACHE SETUP ---
+// stdTTL: 300 seconds (5 minutes) default cache time
+const myCache = new NodeCache({ stdTTL: 300 }); 
+const LEADERBOARD_CACHE_KEY = "leaderboard_data";
+
 // Ensure these paths match where your scraper files actually are
 const { fetchLeetCodeData } = require('../utils/leetcode'); 
 const { 
@@ -53,6 +58,11 @@ const connectPlatform = async (req, res) => {
             [userId, platform, stats.handle, stats.rating, safeRank, stats.problemsSolved]
         );
 
+        // --- CACHE INVALIDATION ---
+        // New data added, so clear the old leaderboard cache
+        myCache.del(LEADERBOARD_CACHE_KEY);
+        console.log("Platform connected. Leaderboard cache cleared.");
+
         res.status(200).json({ message: 'Platform connected successfully', data: savedStats.rows[0] });
 
     } catch (error) {
@@ -82,12 +92,10 @@ const getPlatforms = async (req, res) => {
 // @route   GET /api/platforms/leaderboard
 const getLeaderboard = async (req, res) => {
     try {
-        const cacheKey = "leaderboard_data";
-        
         // 1. Check if data is already in Cache
-        const cachedData = myCache.get(cacheKey);
+        const cachedData = myCache.get(LEADERBOARD_CACHE_KEY);
         if (cachedData) {
-            // console.log("Serving Leaderboard from Cache ⚡"); // Optional: Debug log
+            // console.log("Serving Leaderboard from Cache ⚡"); 
             return res.status(200).json(cachedData);
         }
 
@@ -141,7 +149,7 @@ const getLeaderboard = async (req, res) => {
         };
 
         // 3. Save result to Cache for next time
-        myCache.set(cacheKey, responseData);
+        myCache.set(LEADERBOARD_CACHE_KEY, responseData);
 
         // 4. Send response
         res.status(200).json(responseData);
@@ -167,8 +175,7 @@ const getDashboardStats = async (req, res) => {
 
         const myTotal = parseInt(userStats.rows[0].total_problems);
         const myPlatformCount = parseInt(userStats.rows[0].platform_count);
-        const userId = userStats.rows[0].id;
-
+        
         // 2. Rank Calculation
         const rankResult = await db.query(
             `SELECT COUNT(*) + 1 as rank FROM (
@@ -229,6 +236,12 @@ const updatePlatformHandles = async (req, res) => {
             );
             results.push({ platform, status: 'success' });
         }
+
+        // --- CACHE INVALIDATION ---
+        // User changed handles, stats might change, so clear global leaderboard
+        myCache.del(LEADERBOARD_CACHE_KEY);
+        console.log("Bulk update complete. Leaderboard cache cleared.");
+
         res.status(200).json({ message: 'Process Complete', results });
     } catch (error) {
         console.error("Bulk Update Error:", error);
@@ -259,6 +272,11 @@ const toggleVisibility = async (req, res) => {
             'UPDATE users SET is_hidden = $1 WHERE firebase_uid = $2',
             [is_hidden, firebase_uid]
         );
+        
+        // --- CACHE INVALIDATION ---
+        // User visibility changed, so refresh leaderboard
+        myCache.del(LEADERBOARD_CACHE_KEY);
+        
         res.json({ message: "Visibility updated successfully" });
     } catch (error) {
         console.error("Visibility Update Error:", error);
@@ -332,6 +350,11 @@ const syncUserStats = async (req, res) => {
 
         await db.query('UPDATE users SET sync_count = sync_count + 1 WHERE id = $1', [userId]);
 
+        // --- CACHE INVALIDATION ---
+        // Stats are updated, so clear cache!
+        myCache.del(LEADERBOARD_CACHE_KEY);
+        console.log("Sync complete. Leaderboard cache cleared.");
+
         res.status(200).json({ 
             message: 'Sync Successful', 
             updated: updates,
@@ -343,6 +366,7 @@ const syncUserStats = async (req, res) => {
         res.status(500).json({ error: 'Server Error' });
     }
 };
+
 // @route   GET /api/platforms/profile/:firebase_uid
 const getUserProfile = async (req, res) => {
     const { firebase_uid } = req.params;
