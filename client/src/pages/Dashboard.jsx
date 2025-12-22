@@ -1,550 +1,325 @@
 import React, { useEffect, useState } from "react";
-import { initializeApp } from "firebase/app";
-import { 
-  getAuth, 
-  onAuthStateChanged, 
-  signInAnonymously, 
-  signInWithCustomToken 
-} from "firebase/auth";
-import { 
-  getFirestore, 
-  collection, 
-  doc, 
-  setDoc, 
-  getDocs, 
-  onSnapshot, 
-  serverTimestamp,
-  updateDoc
-} from "firebase/firestore";
-
-// --- CONFIGURATION ---
-const SUPPORTED_PLATFORMS = [
-  { 
-    name: 'LeetCode', 
-    url: 'leetcode.com', 
-    logo: 'https://upload.wikimedia.org/wikipedia/commons/1/19/LeetCode_logo_black.png',
-    profileUrl: 'https://leetcode.com/' 
-  },
-  { 
-    name: 'Codeforces', 
-    url: 'codeforces.com', 
-    logo: 'https://cdn.iconscout.com/icon/free/png-256/free-code-forces-3628695-3029920.png',
-    profileUrl: 'https://codeforces.com/profile/' 
-  },
-  { 
-    name: 'CodeChef', 
-    url: 'codechef.com', 
-    logo: 'https://static-00.iconduck.com/assets.00/codechef-icon-380x512-r1v87w22.png',
-    profileUrl: 'https://www.codechef.com/users/' 
-  },
-  { 
-    name: 'HackerRank', 
-    url: 'hackerrank.com', 
-    logo: 'https://upload.wikimedia.org/wikipedia/commons/4/40/HackerRank_Icon-1000px.png',
-    profileUrl: 'https://www.hackerrank.com/' 
-  },
-  { 
-    name: 'GeeksForGeeks', 
-    url: 'geeksforgeeks.org', 
-    logo: 'https://upload.wikimedia.org/wikipedia/commons/4/43/GeeksforGeeks.svg',
-    profileUrl: 'https://auth.geeksforgeeks.org/user/' 
-  }
-];
-
-// --- COMPONENTS ---
-
-const ActivityGraph = ({ dataPoints = [] }) => {
-  // Guard clause for empty data
-  if (!dataPoints || dataPoints.length === 0) {
-    return (
-      <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col h-full items-center justify-center text-gray-400">
-        <p>No activity data yet</p>
-      </div>
-    );
-  }
-
-  const maxVal = Math.max(...dataPoints, 1);
-  const height = 150;
-  const width = 300;
-  const points = dataPoints
-    .map((val, index) => {
-      const x = (index / (dataPoints.length - 1)) * width;
-      const y = height - (val / maxVal) * height;
-      return `${x},${y}`;
-    })
-    .join(" ");
-
-  return (
-    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col h-full">
-      <h3 className="font-bold text-gray-800 mb-4">Weekly Activity</h3>
-      <div className="flex-1 flex items-end justify-center relative overflow-hidden">
-        <svg viewBox={`0 0 ${width} ${height + 20}`} className="w-full h-full overflow-visible">
-          <defs>
-            <linearGradient id="lineGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#4F46E5" stopOpacity="0.3" />
-              <stop offset="100%" stopColor="#4F46E5" stopOpacity="0" />
-            </linearGradient>
-          </defs>
-          <line x1="0" y1={height} x2={width} y2={height} stroke="#e5e7eb" strokeWidth="1" />
-          <line x1="0" y1={height/2} x2={width} y2={height/2} stroke="#e5e7eb" strokeWidth="1" strokeDasharray="4" />
-          <polygon points={`0,${height} ${points} ${width},${height}`} fill="url(#lineGradient)" />
-          <polyline fill="none" stroke="#4F46E5" strokeWidth="3" points={points} strokeLinecap="round" strokeLinejoin="round" />
-          {dataPoints.map((val, index) => {
-             const x = (index / (dataPoints.length - 1)) * width;
-             const y = height - (val / maxVal) * height;
-             return (
-               <circle key={index} cx={x} cy={y} r="4" fill="#fff" stroke="#4F46E5" strokeWidth="2" className="hover:r-6 transition-all" />
-             );
-          })}
-        </svg>
-      </div>
-    </div>
-  );
-};
-
-const PlatformPieChart = ({ platforms = [] }) => {
-  const total = platforms.reduce((acc, curr) => acc + (parseInt(curr.problems_solved) || 0), 0);
-  const colors = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
-  
-  let currentPct = 0;
-  const segments = platforms.map((p, i) => {
-    const value = parseInt(p.problems_solved) || 0;
-    const percentage = total > 0 ? (value / total) * 100 : 0;
-    const color = colors[i % colors.length];
-    
-    const segment = { ...p, percentage, color, startPct: currentPct, endPct: currentPct + percentage };
-    currentPct += percentage;
-    return segment;
-  });
-
-  const gradientStops = segments.map(s => `${s.color} ${s.startPct}% ${s.endPct}%`);
-  const backgroundStyle = segments.length > 0 
-    ? `conic-gradient(${gradientStops.join(', ')})` 
-    : '#f3f4f6';
-
-  return (
-    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col">
-      <h3 className="font-bold text-gray-800 mb-4">Platform Distribution</h3>
-      <div className="flex items-center gap-8 h-full">
-        <div className="relative w-32 h-32 rounded-full flex-shrink-0" style={{ background: backgroundStyle }}>
-           <div className="absolute inset-0 m-auto w-20 h-20 bg-white rounded-full flex items-center justify-center">
-             <div className="text-center">
-               <span className="block text-xs text-gray-400 font-bold">Total</span>
-               <span className="block text-xl font-black text-gray-800">{total}</span>
-             </div>
-           </div>
-        </div>
-        <div className="flex-1 space-y-2">
-          {segments.length > 0 ? segments.map((s, i) => (
-            <div key={i} className="flex items-center justify-between text-sm">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: s.color }}></div>
-                <span className="text-gray-600 font-medium">{s.platform_name}</span>
-              </div>
-              <span className="font-bold text-gray-900">{Math.round(s.percentage)}%</span>
-            </div>
-          )) : (
-            <p className="text-sm text-gray-400 italic">No data connected</p>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// --- MAIN DASHBOARD ---
+import { getAuth } from "firebase/auth";
+import { useNavigate } from "react-router-dom";
+import axios from "axios";
+import ActivityGraph from "../components/ActivityGraph";
+import PlatformPieChart from "../components/PlatformPieChart";
 
 const Dashboard = () => {
-  // Firebase Init
-  const firebaseConfig = JSON.parse(__firebase_config);
-  const app = initializeApp(firebaseConfig);
-  const auth = getAuth(app);
-  const db = getFirestore(app);
-  const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-
-  // State
+  const navigate = useNavigate();
+  const auth = getAuth();
+  
+  // -- STATE MANAGEMENT --
   const [user, setUser] = useState(null);
   const [platforms, setPlatforms] = useState([]);
   const [stats, setStats] = useState({ 
     totalSolved: 0, 
     collegeRank: 'N/A', 
     activePlatforms: 0, 
-    weeklyProgress: [0, 0, 0, 0, 0, 0, 0]
+    weeklyProgress: [] 
   });
   
   const [loading, setLoading] = useState(true);
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [connecting, setConnecting] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false); // For Sync Button
+  const [connecting, setConnecting] = useState(false); // For Connect Button
+
+  // Input State for connecting new platforms inline
   const [showInput, setShowInput] = useState(null); 
   const [usernameInput, setUsernameInput] = useState("");
-  const [errorMsg, setErrorMsg] = useState("");
 
-  // 1. Auth & Initial Load
-  useEffect(() => {
-    const initAuth = async () => {
-      if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-        await signInWithCustomToken(auth, __initial_auth_token);
-      } else {
-        await signInAnonymously(auth);
-      }
-    };
-    initAuth();
-    
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      if (!currentUser) setLoading(false);
-    });
-    return () => unsubscribe();
-  }, []);
+  // -- CONFIGURATION --
+  const SUPPORTED_PLATFORMS = [
+    { 
+      name: 'LeetCode', 
+      url: 'leetcode.com', 
+      logo: 'https://upload.wikimedia.org/wikipedia/commons/1/19/LeetCode_logo_black.png',
+      profileUrl: 'https://leetcode.com/' 
+    },
+    { 
+      name: 'Codeforces', 
+      url: 'codeforces.com', 
+      logo: 'https://cdn.iconscout.com/icon/free/png-256/free-code-forces-3628695-3029920.png',
+      profileUrl: 'https://codeforces.com/profile/' 
+    },
+    { 
+      name: 'CodeChef', 
+      url: 'codechef.com', 
+      logo: 'https://static-00.iconduck.com/assets.00/codechef-icon-380x512-r1v87w22.png',
+      profileUrl: 'https://www.codechef.com/users/' 
+    },
+    { 
+      name: 'HackerRank', 
+      url: 'hackerrank.com', 
+      logo: 'https://upload.wikimedia.org/wikipedia/commons/4/40/HackerRank_Icon-1000px.png',
+      profileUrl: 'https://www.hackerrank.com/' 
+    },
+    { 
+      name: 'GeeksForGeeks', 
+      url: 'geeksforgeeks.org', 
+      logo: 'https://upload.wikimedia.org/wikipedia/commons/4/43/GeeksforGeeks.svg',
+      profileUrl: 'https://auth.geeksforgeeks.org/user/' 
+    }
+  ];
 
-  // 2. Real Data Listener (Firestore)
-  useEffect(() => {
-    if (!user) return;
+  // -- API FUNCTIONS --
 
-    // Listen to Platforms Collection
-    const platformsRef = collection(db, 'artifacts', appId, 'users', user.uid, 'platforms');
-    const unsubPlatforms = onSnapshot(platformsRef, (snapshot) => {
-      const loadedPlatforms = snapshot.docs.map(doc => doc.data());
-      setPlatforms(loadedPlatforms);
-      
-      // Calculate derived stats directly from real data
-      const total = loadedPlatforms.reduce((acc, p) => acc + (parseInt(p.problems_solved) || 0), 0);
-      setStats(prev => ({
-        ...prev,
-        totalSolved: total,
-        activePlatforms: loadedPlatforms.length,
-        // Mocking weekly progress for now as we don't have historical data stored yet
-        // In a full app, you'd query a 'history' collection
-        weeklyProgress: [Math.max(0, total - 10), Math.max(0, total - 8), Math.max(0, total - 5), total, total, total, total]
-      }));
+  // 1. Fetch All Data
+  const fetchDashboardData = async (uid) => {
+    try {
+      const [platformRes, statsRes] = await Promise.all([
+        axios.get(`/api/platforms/${uid}`),
+        axios.get(`/api/platforms/stats/${uid}`)
+      ]);
+
+      setPlatforms(platformRes.data);
+      setStats(statsRes.data);
       setLoading(false);
-    }, (error) => {
-      console.error("Error fetching platforms:", error);
+    } catch (err) {
+      console.error("Error fetching dashboard data", err);
       setLoading(false);
-    });
+    }
+  };
 
-    return () => unsubPlatforms();
-  }, [user]);
-
-  // 3. Connect Platform (Write to DB + Real API Fetch for Codeforces)
+  // 2. Connect New Platform
   const handleConnect = async (platformName) => {
     if (!usernameInput) return;
     setConnecting(true);
-    setErrorMsg("");
-
     try {
-      let rating = 0;
-      let solved = 0;
-      
-      // --- REAL API FETCHING LOGIC ---
-      if (platformName === 'Codeforces') {
-        try {
-          const response = await fetch(`https://codeforces.com/api/user.info?handles=${usernameInput}`);
-          const data = await response.json();
-          if (data.status === 'OK') {
-             rating = data.result[0].rating || 0;
-             // Codeforces doesn't give solved count in user.info easily without heavy scraping
-             // We will initialize it, or user can manually update via a sync later
-             solved = data.result[0].contribution * 5; // Just a dummy heuristic since real scrape is hard client-side
-          } else {
-             throw new Error("Handle not found");
-          }
-        } catch (e) {
-          console.warn("Could not fetch live Codeforces data (CORS or Invalid Handle)", e);
-          // We proceed anyway to save the handle, assuming manual sync later
-        }
-      } 
-      
-      // Note: LeetCode/others block client-side API calls via CORS. 
-      // We save the handle to DB so a backend job could scrape it later.
-      
-      // Save to Firestore (Real Persistence)
-      const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'platforms', platformName);
-      await setDoc(docRef, {
-        platform_name: platformName,
-        platform_handle: usernameInput,
-        problems_solved: solved,
-        rating: rating,
-        last_updated: serverTimestamp()
+      await axios.post('/api/platforms/connect', {
+        firebase_uid: user.uid,
+        platform: platformName,
+        username: usernameInput
       });
-
+      alert(`${platformName} Connected Successfully!`);
       setShowInput(null);
       setUsernameInput("");
+      fetchDashboardData(user.uid); // Refresh UI
     } catch (error) {
       console.error(error);
-      setErrorMsg(`Failed to connect: ${error.message}`);
+      alert(`Error connecting to ${platformName}. Please check the username.`);
     } finally {
       setConnecting(false);
     }
   };
 
-  // 4. Sync Data (Simulation of Backend Job)
+  // 3. Sync / Refresh Data (Rate Limited)
   const handleSync = async () => {
-    if (!user) return;
     setIsSyncing(true);
-    
-    // In a real app, this would trigger a Cloud Function.
-    // Here, we'll simulate a random update to the DB to show reactivity.
     try {
-        const platformsRef = collection(db, 'artifacts', appId, 'users', user.uid, 'platforms');
-        const snapshot = await getDocs(platformsRef);
-        
-        const updates = snapshot.docs.map(async (d) => {
-           const current = d.data();
-           // Simulate finding 1 new problem solved
-           await updateDoc(d.ref, {
-              problems_solved: (current.problems_solved || 0) + 1,
-              last_updated: serverTimestamp()
-           });
+        const res = await axios.post('/api/platforms/sync', {
+            firebase_uid: user.uid
         });
         
-        await Promise.all(updates);
-    } catch (e) {
-        console.error("Sync error", e);
+        // Show success message with remaining attempts
+        alert(`Sync Complete! Updated: ${res.data.updated.join(', ')}. \nRemaining syncs for today: ${res.data.remaining}`);
+        
+        fetchDashboardData(user.uid); // Refresh UI with new numbers
+    } catch (error) {
+        console.error(error);
+        const errMsg = error.response?.data?.error || "Sync failed. Try again later.";
+        alert(errMsg);
     } finally {
-        setTimeout(() => setIsSyncing(false), 1000);
+        setIsSyncing(false);
     }
   };
 
+  // -- AUTH EFFECT --
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged((currentUser) => {
+      if (!currentUser) {
+        navigate("/");
+      } else {
+        setUser(currentUser);
+        fetchDashboardData(currentUser.uid);
+      }
+    });
+    return () => unsubscribe();
+  }, [navigate, auth]);
+
+  // Helper to find platform specific data
   const getPlatformData = (name) => platforms.find(p => p.platform_name === name);
 
-  if (loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="flex flex-col items-center gap-4">
-            <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-            <span className="text-blue-600 font-medium animate-pulse">Connecting to Database...</span>
-        </div>
-    </div>
-  );
+  if (loading) return <div className="min-h-screen flex items-center justify-center text-blue-600 font-medium">Loading Dashboard...</div>;
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-12 font-sans text-gray-900">
-      <div className="max-w-7xl mx-auto px-4 md:px-6 py-8">
+    <div className="min-h-screen bg-gray-50 pb-12">
+      
+      {/* Note: Navbar is removed from here because it's in App.jsx */}
+
+      <div className="max-w-7xl mx-auto px-6 py-8">
         
-        {/* HEADER */}
-        <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4 bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+        {/* --- HEADER SECTION --- */}
+        <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
             <div className="text-center md:text-left">
-                <h1 className="text-3xl font-black text-gray-900 tracking-tight">
-                    Welcome back! 👋
+                <h1 className="text-3xl font-bold text-gray-900">
+                    Welcome back, {user.displayName ? user.displayName.split(' ')[0] : 'Coder'}! 👋
                 </h1>
-                <p className="text-gray-500 mt-1 font-medium">Real-time stats from your connected accounts.</p>
+                <p className="text-gray-500 mt-1">Track your progress and analyze your performance.</p>
             </div>
 
             <div className="flex items-center gap-3">
+                {/* Sync Button */}
                 <button 
-                      onClick={handleSync}
-                      disabled={isSyncing}
-                      className={`flex items-center gap-2 text-sm font-bold px-5 py-2.5 rounded-xl transition-all border shadow-sm
-                          ${isSyncing 
-                              ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-gray-200' 
-                              : 'bg-white text-indigo-600 border-indigo-100 hover:bg-indigo-50 hover:border-indigo-200'
-                          }`}
-                  >
-                      <svg className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                      </svg>
-                      {isSyncing ? 'Updating DB...' : 'Sync Data'}
-                  </button>
+                    onClick={handleSync}
+                    disabled={isSyncing}
+                    className={`flex items-center gap-2 text-sm font-bold px-5 py-2.5 rounded-xl transition-all border shadow-sm
+                        ${isSyncing 
+                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-gray-200' 
+                            : 'bg-white text-indigo-600 border-indigo-100 hover:bg-indigo-50 hover:border-indigo-200'
+                        }`}
+                >
+                    <svg className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    {isSyncing ? 'Syncing...' : 'Sync Data'}
+                </button>
+
+                {/* Edit Profile Button */}
+                <button 
+                    onClick={() => navigate('/edit-profile')}
+                    className="flex items-center gap-2 bg-blue-600 text-white text-sm font-bold px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-all shadow-blue-200 shadow-md"
+                >
+                    <span>Edit Profile</span>
+                </button>
+                <button 
+  onClick={() => navigate('/profile')} 
+  className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold shadow-md hover:bg-indigo-700 transition-colors"
+>
+  View Full Profile
+</button>
             </div>
         </div>
 
-        {/* MAIN GRID */}
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
-            
-            {/* LEFT COLUMN */}
-            <div className="lg:col-span-3 space-y-8">
-                
-                {/* Stats */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center justify-between relative overflow-hidden group">
-                         <div className="absolute right-0 top-0 w-24 h-24 bg-blue-50 rounded-bl-full -mr-4 -mt-4 opacity-50"></div>
-                         <div className="relative z-10">
-                            <p className="text-gray-400 text-xs font-bold uppercase tracking-wider">Total Problems</p>
-                            <h2 className="text-4xl font-black text-gray-900 mt-2">{stats.totalSolved}</h2>
-                         </div>
-                         <div className="relative z-10 bg-blue-100 p-3 rounded-xl text-blue-600">
-                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
-                         </div>
-                    </div>
-                    
-                    {/* Rank (Static for now as it requires analyzing all users) */}
-                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center justify-between relative overflow-hidden group">
-                         <div className="absolute right-0 top-0 w-24 h-24 bg-yellow-50 rounded-bl-full -mr-4 -mt-4 opacity-50"></div>
-                         <div className="relative z-10">
-                            <p className="text-gray-400 text-xs font-bold uppercase tracking-wider">College Rank</p>
-                            <h2 className="text-4xl font-black text-gray-900 mt-2">#{stats.collegeRank}</h2>
-                         </div>
-                         <div className="relative z-10 bg-yellow-100 p-3 rounded-xl text-yellow-600">
-                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
-                         </div>
-                    </div>
-
-                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center justify-between relative overflow-hidden group">
-                         <div className="absolute right-0 top-0 w-24 h-24 bg-green-50 rounded-bl-full -mr-4 -mt-4 opacity-50"></div>
-                         <div className="relative z-10">
-                            <p className="text-gray-400 text-xs font-bold uppercase tracking-wider">Active Platforms</p>
-                            <h2 className="text-4xl font-black text-gray-900 mt-2">{stats.activePlatforms}</h2>
-                         </div>
-                         <div className="relative z-10 bg-green-100 p-3 rounded-xl text-green-600">
-                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
-                         </div>
-                    </div>
-                </div>
-
-                {/* Graphs */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <ActivityGraph dataPoints={stats.weeklyProgress} />
-                    <PlatformPieChart platforms={platforms} /> 
-                </div>
-
-                {/* Platforms List */}
+        {/* --- TOP STAT CARDS --- */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center justify-between hover:shadow-md transition-shadow">
                 <div>
-                    <h2 className="text-2xl font-black text-gray-900 mb-6 flex items-center gap-3">
-                        Your Platforms <span className="text-xs font-bold text-white bg-blue-600 px-3 py-1 rounded-full shadow-sm shadow-blue-200">{platforms.length} Connected</span>
-                    </h2>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {SUPPORTED_PLATFORMS.map((plat) => {
-                            const data = getPlatformData(plat.name);
-                            const isConnected = !!data;
-                            const isEditing = showInput === plat.name;
+                    <p className="text-gray-500 text-sm font-semibold uppercase tracking-wider">Total Problems</p>
+                    <h2 className="text-4xl font-black text-gray-900 mt-2">{stats.totalSolved}</h2>
+                </div>
+                <div className="bg-blue-50 p-4 rounded-full text-blue-600">
+                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+                </div>
+            </div>
 
-                            return (
-                                <div key={plat.name} className={`bg-white p-6 rounded-2xl shadow-sm border transition-all relative overflow-hidden group ${isConnected ? 'border-gray-100 hover:shadow-md' : 'border-gray-200 border-dashed bg-gray-50'}`}>
-                                    {isConnected && (
-                                      <div className="absolute top-0 right-0 -mr-8 -mt-8 w-24 h-24 rounded-full bg-gray-50 group-hover:bg-blue-50 transition-colors z-0"></div>
-                                    )}
-                                    <div className="relative z-10">
-                                        <div className="flex justify-between items-start mb-4">
-                                            <div className="flex items-center gap-4">
-                                                <div className="w-12 h-12 flex items-center justify-center bg-white rounded-xl shadow-sm border border-gray-100 p-1">
-                                                   <img src={plat.logo} className="w-full h-full object-contain" alt={plat.name} />
-                                                </div>
-                                                <div>
-                                                    <h3 className="font-bold text-lg text-gray-800">{plat.name}</h3>
-                                                    <a href={`https://${plat.url}`} target="_blank" rel="noreferrer" className="text-xs text-gray-400 hover:text-blue-500 transition-colors">{plat.url}</a>
-                                                </div>
-                                            </div>
-                                            {isConnected ? (
-                                                <span className="bg-green-100 text-green-700 text-[10px] px-2 py-1 rounded-full font-bold uppercase tracking-wider border border-green-200">Active</span>
-                                            ) : (
-                                                <span className="bg-gray-200 text-gray-500 text-[10px] px-2 py-1 rounded-full font-bold uppercase tracking-wider">Inactive</span>
-                                            )}
-                                        </div>
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center justify-between hover:shadow-md transition-shadow">
+                <div>
+                    <p className="text-gray-500 text-sm font-semibold uppercase tracking-wider">College Rank</p>
+                    <h2 className="text-4xl font-black text-gray-900 mt-2">#{stats.collegeRank}</h2>
+                </div>
+                <div className="bg-yellow-50 p-4 rounded-full text-yellow-600">
+                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
+                </div>
+            </div>
 
-                                        {isConnected ? (
-                                            <div className="mt-6 space-y-3">
-                                                <div className="flex justify-between text-sm p-3 bg-gray-50 rounded-xl border border-gray-100">
-                                                    <span className="text-gray-500 font-medium">Problems Solved</span>
-                                                    <span className="font-black text-lg text-gray-900">{data.problems_solved}</span>
-                                                </div>
-                                                <div className="flex justify-between items-center px-1">
-                                                    <span className="text-xs text-gray-400 font-bold tracking-wider">RATING</span>
-                                                    <span className="font-bold text-gray-700">{data.rating > 0 ? data.rating : 'N/A'}</span>
-                                                </div>
-                                                <div className="flex justify-between items-center px-1 border-t border-gray-100 pt-3 mt-2">
-                                                    <span className="text-xs text-gray-400 font-bold tracking-wider">HANDLE</span>
-                                                    <a href={`${plat.profileUrl}${data.platform_handle}`} target="_blank" rel="noopener noreferrer" className="font-mono text-xs text-blue-600 hover:underline bg-blue-50 px-2 py-1 rounded">
-                                                        @{data.platform_handle}
-                                                    </a>
-                                                </div>
-                                            </div>
-                                        ) : (
-                                            <div>
-                                                {isEditing ? (
-                                                    <div className="mt-6 animate-fadeIn">
-                                                        <label className="text-xs font-bold text-gray-500 mb-1 block uppercase">Enter {plat.name} Username</label>
-                                                        <div className="flex gap-2">
-                                                            <input 
-                                                                type="text" 
-                                                                className="border border-gray-300 rounded-lg px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all bg-white"
-                                                                value={usernameInput}
-                                                                onChange={(e) => setUsernameInput(e.target.value)}
-                                                                placeholder="e.g. johndoe123"
-                                                                autoFocus
-                                                            />
-                                                            <button 
-                                                                onClick={() => handleConnect(plat.name)}
-                                                                disabled={connecting}
-                                                                className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 font-bold transition-colors disabled:opacity-70 flex items-center shadow-lg shadow-blue-200"
-                                                            >
-                                                                {connecting ? (
-                                                                    <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                                                                ) : 'Save'}
-                                                            </button>
-                                                        </div>
-                                                        {errorMsg && <p className="text-xs text-red-500 mt-2">{errorMsg}</p>}
-                                                        <button onClick={() => setShowInput(null)} className="text-xs text-gray-400 mt-2 hover:text-gray-600 font-medium">Cancel</button>
-                                                    </div>
-                                                ) : (
-                                                    <button 
-                                                        onClick={() => setShowInput(plat.name)}
-                                                        className="w-full mt-6 py-3 border border-dashed border-gray-300 text-gray-400 rounded-xl hover:border-blue-500 hover:text-blue-600 hover:bg-blue-50 transition-all font-bold text-sm flex items-center justify-center gap-2"
-                                                    >
-                                                        <span>+</span> Connect Account
-                                                    </button>
-                                                )}
-                                            </div>
-                                        )}
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center justify-between hover:shadow-md transition-shadow">
+                <div>
+                    <p className="text-gray-500 text-sm font-semibold uppercase tracking-wider">Active Platforms</p>
+                    <h2 className="text-4xl font-black text-gray-900 mt-2">{stats.activePlatforms}</h2>
+                </div>
+                <div className="bg-green-50 p-4 rounded-full text-green-600">
+                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
+                </div>
+            </div>
+        </div>
+
+        {/* --- GRAPHS SECTION --- */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <ActivityGraph dataPoints={stats.weeklyProgress} />
+            <PlatformPieChart platforms={platforms} /> 
+        </div>
+
+        {/* --- PLATFORMS GRID --- */}
+        <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+            Your Platforms <span className="text-sm font-normal text-gray-500 bg-gray-100 px-2 py-1 rounded-md">{platforms.length} Connected</span>
+        </h2>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            
+            {/* Dynamic Card Generation */}
+            {SUPPORTED_PLATFORMS.map((plat) => {
+                const data = getPlatformData(plat.name);
+                const isConnected = !!data;
+                const isEditing = showInput === plat.name;
+
+                return (
+                    <div key={plat.name} className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-all relative overflow-hidden group">
+                        
+                        {/* Decorative background blob */}
+                        <div className="absolute top-0 right-0 -mr-8 -mt-8 w-24 h-24 rounded-full bg-gray-50 group-hover:bg-blue-50 transition-colors z-0"></div>
+
+                        <div className="relative z-10">
+                            <div className="flex justify-between items-start mb-4">
+                                <div className="flex items-center gap-4">
+                                    <img src={plat.logo} className="w-10 h-10 object-contain" alt={plat.name} />
+                                    <div>
+                                        <h3 className="font-bold text-lg text-gray-800">{plat.name}</h3>
+                                        <a href={`https://${plat.url}`} target="_blank" rel="noreferrer" className="text-xs text-gray-400 hover:text-blue-500 transition-colors">{plat.url}</a>
                                     </div>
                                 </div>
-                            );
-                        })}
-                    </div>
-                </div>
+                                {isConnected ? (
+                                    <span className="bg-green-100 text-green-700 text-[10px] px-2 py-1 rounded-full font-bold uppercase tracking-wider">Active</span>
+                                ) : (
+                                    <span className="bg-gray-100 text-gray-500 text-[10px] px-2 py-1 rounded-full font-bold uppercase tracking-wider">Inactive</span>
+                                )}
+                            </div>
 
-            </div>
-
-            {/* RIGHT COLUMN */}
-            <div className="lg:col-span-1 space-y-6">
-                
-                <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
-                    <div className="flex items-center gap-2 mb-3">
-                        <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center">
-                            <svg className="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            {isConnected ? (
+                                <div className="mt-6 space-y-3">
+                                    <div className="flex justify-between text-sm p-3 bg-gray-50 rounded-xl border border-gray-100">
+                                        <span className="text-gray-500 font-medium">Problems Solved</span>
+                                        <span className="font-black text-lg text-gray-900">{data.problems_solved}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center px-1">
+                                        <span className="text-xs text-gray-400 font-medium">RATING</span>
+                                        <span className="font-bold text-gray-700">{data.rating > 0 ? data.rating : 'N/A'}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center px-1 border-t border-gray-100 pt-2 mt-2">
+                                        <span className="text-xs text-gray-400">HANDLE</span>
+                                        <a href={`${plat.profileUrl}${data.platform_handle}`} target="_blank" rel="noopener noreferrer" className="font-mono text-xs text-blue-600 hover:underline bg-blue-50 px-2 py-1 rounded">
+                                            @{data.platform_handle}
+                                        </a>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div>
+                                    {isEditing ? (
+                                        <div className="mt-6">
+                                            <label className="text-xs font-bold text-gray-500 mb-1 block">Enter Username</label>
+                                            <div className="flex gap-2">
+                                                <input 
+                                                    type="text" 
+                                                    className="border border-gray-300 rounded-lg px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                                                    value={usernameInput}
+                                                    onChange={(e) => setUsernameInput(e.target.value)}
+                                                    autoFocus
+                                                />
+                                                <button 
+                                                    onClick={() => handleConnect(plat.name)}
+                                                    disabled={connecting}
+                                                    className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 font-bold transition-colors disabled:opacity-70 flex items-center"
+                                                >
+                                                    {connecting ? (
+                                                        <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                                                    ) : 'Save'}
+                                                </button>
+                                            </div>
+                                            <button onClick={() => setShowInput(null)} className="text-xs text-gray-400 mt-2 hover:text-gray-600 underline">Cancel</button>
+                                        </div>
+                                    ) : (
+                                        <button 
+                                            onClick={() => setShowInput(plat.name)}
+                                            className="w-full mt-6 py-3 border border-dashed border-gray-300 text-gray-500 rounded-xl hover:border-blue-500 hover:text-blue-600 hover:bg-blue-50 transition-all font-bold text-sm flex items-center justify-center gap-2"
+                                        >
+                                            <span>+</span> Connect Account
+                                        </button>
+                                    )}
+                                </div>
+                            )}
                         </div>
-                        <h3 className="font-bold text-gray-800 text-sm">Real Data Mode</h3>
                     </div>
-                    <p className="text-xs text-gray-600 leading-relaxed mb-3">
-                        You are connected to the live database. <br/><br/>
-                        <span className="font-bold text-amber-600">Codeforces:</span> Updates live via API.<br/>
-                        <span className="font-bold text-amber-600">Others:</span> Saves handle to DB; requires backend worker for live scraping.
-                    </p>
-                </div>
-
-                <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
-                    <div className="flex items-center gap-2 mb-4">
-                        <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
-                            <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
-                        </div>
-                        <h3 className="font-bold text-gray-800 text-sm">Score Weights (XP)</h3>
-                    </div>
-                    
-                    <div className="space-y-3">
-                        <div className="flex justify-between items-center text-xs border-b border-gray-50 pb-2">
-                            <span className="text-gray-500">LeetCode</span>
-                            <span className="font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-md">× 1.2</span>
-                        </div>
-                        <div className="flex justify-between items-center text-xs border-b border-gray-50 pb-2">
-                            <span className="text-gray-500">Codeforces</span>
-                            <span className="font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-md">× 1.2</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-5 rounded-2xl shadow-lg shadow-indigo-200 text-white relative overflow-hidden">
-                    <div className="absolute top-0 right-0 -mr-6 -mt-6 w-24 h-24 bg-white opacity-10 rounded-full"></div>
-                    <div className="flex items-center gap-2 mb-3 relative z-10">
-                        <svg className="w-5 h-5 text-yellow-300" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
-                        <h3 className="font-bold text-sm">Rank Boost Strategy</h3>
-                    </div>
-                    <p className="text-xs text-indigo-100 leading-relaxed relative z-10">
-                        Want to climb the leaderboard faster? Focus on solving problems on high-weight platforms like <span className="font-bold text-white border-b border-indigo-300/50">Codeforces</span> and <span className="font-bold text-white border-b border-indigo-300/50">LeetCode</span>.
-                    </p>
-                </div>
-
-            </div>
-
+                );
+            })}
         </div>
       </div>
     </div>
