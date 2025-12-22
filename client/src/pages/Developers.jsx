@@ -241,7 +241,7 @@ const Developers = () => {
             <div className="relative shrink-0">
                <div className="w-36 h-36 md:w-44 md:h-44 rounded-full border-[6px] border-white/20 shadow-2xl overflow-hidden bg-white/10 backdrop-blur-sm">
                   <img 
-                    src={`https://ui-avatars.com/api/?name=${mainDev.name}&background=111827&color=fff&size=256`} 
+                    src={`/images/my1.jpg`} 
                     alt={mainDev.name} 
                     className="w-full h-full object-cover"
                   />
