@@ -17,19 +17,26 @@ const Home = () => {
     return () => unsubscribe();
   }, [auth]);
 
-  useEffect(() => {
+useEffect(() => {
+    let isMounted = true; // prevent memory leaks if user leaves page
+
     axios.get('/api/platforms/leaderboard')
       .then(res => {
-        const data = res.data.leaderboard || [];
-        setTopPerformers(data.slice(0, 5));
-        loading(false);
+        if (isMounted) {
+          const data = res.data.leaderboard || [];
+          setTopPerformers(data.slice(0, 5));
+          setLoading(false); // <--- FIXED: Was loading(false)
+        }
       })
       .catch(err => {
-        // console.error("Error loading top performers:", err); // Suppress log for clean UI
-        setLoading(false);
+        console.error("Error loading top performers:", err);
+        if (isMounted) {
+          setLoading(false); // <--- FIXED: Was loading(false)
+        }
       });
-  }, []);
 
+    return () => { isMounted = false };
+  }, []);
   return (
     <div className="min-h-screen bg-white font-sans text-gray-900">
       
