@@ -12,7 +12,7 @@ const SortIcon = ({ active, direction }) => (
 );
 
 // --- ROW COMPONENT ---
-const TableRow = ({ student, index, isSticky, currentUserEmail, getRatingColor }) => {
+const TableRow = ({ student, index, isSticky, currentUserEmail }) => {
     const isMe = student.email === currentUserEmail;
     
     return (
@@ -47,50 +47,50 @@ const TableRow = ({ student, index, isSticky, currentUserEmail, getRatingColor }
                     <div className="flex flex-col">
                         <div className="flex items-center gap-2">
                             <span className="font-bold text-gray-800 group-hover:text-blue-700 transition-colors">
-                                {student.full_name || "Unknown"}
+                                {student.full_name || student.name || "Unknown"}
                             </span>
                             {isMe && <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-bold tracking-wider">YOU</span>}
                         </div>
-                        <span className="text-xs text-gray-400 font-medium">
+                        <span className="text-xs text-gray-400 font-medium uppercase">
                             {student.branch} • Year {student.year}
                         </span>
                     </div>
                 </div>
             </td>
 
-            {/* Total Problems Solved (Corrected Key) */}
+            {/* Total Problems Solved */}
             <td className="py-4 px-4 text-center">
                 <span className="inline-block bg-gray-100 text-gray-700 px-2 py-1 rounded text-xs font-bold border border-gray-200">
                     {parseInt(student.total_solved || 0).toLocaleString()}
                 </span>
             </td>
 
-            {/* Weighted Score (Corrected Key) */}
+            {/* Weighted Score */}
             <td className="py-4 px-4 text-center">
                 <span className="font-black text-blue-600 text-base tracking-tight">
                     {parseInt(student.calculated_score || 0).toLocaleString()}
                 </span>
             </td>
 
-            {/* Individual Platform Mappings (Optimized) */}
+            {/* Individual Platform Counts - Verified against SQL output */}
             <td className="py-4 px-4 text-center text-xs font-medium text-gray-600">
-                {student.leetcode_count || '-'}
+                {student.leetcode_count > 0 ? student.leetcode_count : '-'}
             </td>
             
             <td className="py-4 px-4 text-center text-xs font-medium text-gray-600">
-                {student.codeforces_count || '-'}
+                {student.codeforces_count > 0 ? student.codeforces_count : '-'}
             </td>
 
             <td className="py-4 px-4 text-center text-xs font-medium text-gray-600">
-                {student.codechef_count || '-'}
+                {student.codechef_count > 0 ? student.codechef_count : '-'}
             </td>
 
             <td className="py-4 px-4 text-center text-xs font-medium text-gray-600">
-                {student.hackerrank_count || '-'}
+                {student.hackerrank_count > 0 ? student.hackerrank_count : '-'}
             </td>
 
             <td className="py-4 px-4 text-center text-xs font-medium text-gray-600">
-                {student.gfg_count || '-'}
+                {student.gfg_count > 0 ? student.gfg_count : '-'}
             </td>
         </tr>
     );
@@ -134,9 +134,7 @@ const Leaderboard = () => {
 
     const handleSort = (key) => {
         let direction = 'desc';
-        if (sortConfig.key === key && sortConfig.direction === 'desc') {
-            direction = 'asc';
-        }
+        if (sortConfig.key === key && sortConfig.direction === 'desc') direction = 'asc';
         setSortConfig({ key, direction });
     };
 
@@ -155,78 +153,53 @@ const Leaderboard = () => {
                 return sortConfig.direction === 'asc' ? valA - valB : valB - valA;
             });
         }
-
         return result;
     }, [users, filterBranch, filterYear, filterSem, searchTerm, sortConfig]);
 
-    const currentUserIndex = processedUsers.findIndex(u => u.email === currentUserEmail);
-    const currentUserData = currentUserIndex !== -1 ? processedUsers[currentUserIndex] : null;
-
-    const getRatingColor = (rating) => {
-        if (rating < 1200) return "text-gray-500";
-        if (rating < 1400) return "text-green-600";
-        if (rating < 1600) return "text-cyan-600";
-        if (rating < 1900) return "text-blue-600";
-        if (rating < 2100) return "text-purple-600";
-        if (rating < 2400) return "text-yellow-600";
-        return "text-red-600";
-    };
+    const currentUserData = useMemo(() => 
+        processedUsers.find(u => u.email === currentUserEmail), 
+    [processedUsers, currentUserEmail]);
 
     return (
         <div className="min-h-screen bg-gray-50/50 p-6 font-sans text-gray-900">
             <div className="max-w-7xl mx-auto">
-                
-                {/* Header */}
                 <div className="flex justify-between items-end mb-8">
                     <div>
                         <h1 className="text-3xl font-black text-gray-900 tracking-tight">Leaderboard</h1>
                         <p className="text-gray-500 mt-1 text-sm font-medium">Real-time competitive programming rankings</p>
                     </div>
-                    <button 
-                        onClick={() => navigate('/dashboard')} 
-                        className="bg-white border border-gray-200 text-gray-700 px-5 py-2.5 rounded-xl hover:bg-gray-50 hover:border-gray-300 font-semibold text-sm transition-all shadow-sm flex items-center gap-2"
-                    >
-                        <span>←</span> Back to Dashboard
+                    <button onClick={() => navigate('/dashboard')} className="bg-white border border-gray-200 text-gray-700 px-5 py-2.5 rounded-xl hover:bg-gray-50 font-semibold text-sm transition-all shadow-sm">
+                        ← Back to Dashboard
                     </button>
                 </div>
 
                 {/* --- Coder of Week Card --- */}
                 {coderOfWeek && !searchTerm && (
-                    <div className="relative mb-10 overflow-hidden rounded-3xl bg-gradient-to-r from-violet-600 to-indigo-600 shadow-2xl shadow-indigo-200 transform hover:scale-[1.01] transition-transform duration-300">
+                    <div className="relative mb-10 overflow-hidden rounded-3xl bg-gradient-to-r from-violet-600 to-indigo-600 shadow-2xl">
                         <div className="absolute top-0 right-0 -mr-20 -mt-20 w-96 h-96 rounded-full bg-white opacity-10 blur-3xl"></div>
-                        <div className="absolute bottom-0 left-0 -ml-20 -mb-20 w-72 h-72 rounded-full bg-indigo-400 opacity-20 blur-3xl"></div>
-
-                        <div className="relative z-10 p-8 md:p-10 flex flex-col md:flex-row items-center gap-8 md:gap-12">
+                        <div className="relative z-10 p-8 md:p-10 flex flex-col md:flex-row items-center gap-8 text-white">
                             <div className="relative">
                                 {coderOfWeek.photo_url ? (
                                     <img src={coderOfWeek.photo_url} alt="" className="w-28 h-28 md:w-32 md:h-32 rounded-full border-4 border-white/20 shadow-2xl object-cover" />
                                 ) : (
-                                    <div className="w-28 h-28 md:w-32 md:h-32 rounded-full bg-white border-4 border-white/20 shadow-2xl flex items-center justify-center text-4xl font-black text-indigo-600">
+                                    <div className="w-28 h-28 md:w-32 md:h-32 rounded-full bg-white flex items-center justify-center text-4xl font-black text-indigo-600">
                                         {coderOfWeek.full_name ? coderOfWeek.full_name.charAt(0).toUpperCase() : 'C'}
                                     </div>
                                 )}
-                                <div className="absolute -bottom-3 left-1/2 transform -translate-x-1/2 bg-yellow-400 text-yellow-900 text-xs font-bold px-3 py-1 rounded-full shadow-lg border border-yellow-200">
-                                    #1 TOP RANK
-                                </div>
+                                <div className="absolute -bottom-3 left-1/2 transform -translate-x-1/2 bg-yellow-400 text-yellow-900 text-xs font-bold px-3 py-1 rounded-full shadow-lg">#1 TOP RANK</div>
                             </div>
-
-                            <div className="text-center md:text-left flex-1 text-white">
-                                <div className="inline-block bg-indigo-500/30 backdrop-blur-md border border-indigo-400/30 px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-widest mb-3 text-indigo-100">
-                                    Coder of the Week
-                                </div>
+                            <div className="text-center md:text-left flex-1">
+                                <div className="inline-block bg-indigo-500/30 backdrop-blur-md px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-widest mb-3 text-indigo-100">Coder of the Week</div>
                                 <h2 className="text-3xl md:text-4xl font-bold mb-2">{coderOfWeek.full_name || coderOfWeek.name}</h2>
-                                <p className="text-indigo-200 font-medium text-lg mb-6">
-                                    {coderOfWeek.branch} • Year {coderOfWeek.year}
-                                </p>
-
+                                <p className="text-indigo-200 font-medium mb-6">{coderOfWeek.branch} • Year {coderOfWeek.year}</p>
                                 <div className="flex flex-wrap justify-center md:justify-start gap-4">
                                     <div className="bg-white/10 px-5 py-3 rounded-2xl backdrop-blur-sm border border-white/10">
                                         <p className="text-xs text-indigo-200 uppercase font-bold tracking-wider">Total Score</p>
-                                        <p className="text-2xl font-black text-white">{parseInt(coderOfWeek.calculated_score || coderOfWeek.total_score || 0).toLocaleString()}</p>
+                                        <p className="text-2xl font-black">{parseInt(coderOfWeek.calculated_score || 0).toLocaleString()}</p>
                                     </div>
                                     <div className="bg-white/10 px-5 py-3 rounded-2xl backdrop-blur-sm border border-white/10">
                                         <p className="text-xs text-indigo-200 uppercase font-bold tracking-wider">Problems Solved</p>
-                                        <p className="text-2xl font-black text-white">{parseInt(coderOfWeek.total_solved || 0).toLocaleString()}</p>
+                                        <p className="text-2xl font-black">{parseInt(coderOfWeek.total_solved || 0).toLocaleString()}</p>
                                     </div>
                                 </div>
                             </div>
@@ -238,28 +211,18 @@ const Leaderboard = () => {
                 <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-200 mb-6 sticky top-4 z-20">
                     <div className="flex flex-col lg:flex-row gap-4 justify-between items-center">
                         <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
-                            <select className="bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 outline-none font-medium" onChange={(e) => setFilterBranch(e.target.value)}>
+                            <select className="bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-lg p-2.5 outline-none font-medium" onChange={(e) => setFilterBranch(e.target.value)}>
                                 <option value="All">All Branches</option>
-                                <option value="CSE">CSE</option>
-                                <option value="IT">IT</option>
-                                <option value="ECE">ECE</option>
-                                <option value="ME">ME</option>
-                                <option value="CIVIL">CIVIL</option>
+                                <option value="CSE">CSE</option><option value="IT">IT</option><option value="ECE">ECE</option>
                             </select>
-                            <select className="bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 outline-none font-medium" onChange={(e) => setFilterYear(e.target.value)}>
+                            <select className="bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-lg p-2.5 outline-none font-medium" onChange={(e) => setFilterYear(e.target.value)}>
                                 <option value="All">All Years</option>
-                                <option value="1">1st Year</option>
-                                <option value="2">2nd Year</option>
-                                <option value="3">3rd Year</option>
-                                <option value="4">4th Year</option>
+                                <option value="1">1st Year</option><option value="2">2nd Year</option><option value="3">3rd Year</option><option value="4">4th Year</option>
                             </select>
                         </div>
-
                         <div className="relative w-full lg:w-96">
-                            <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                            </div>
-                            <input type="search" className="block w-full p-2.5 pl-10 text-sm text-gray-900 border border-gray-200 rounded-xl bg-gray-50 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="Search student name..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                            <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none"><svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg></div>
+                            <input type="search" className="block w-full p-2.5 pl-10 text-sm text-gray-900 border border-gray-200 rounded-xl bg-gray-50 focus:ring-blue-500 outline-none" placeholder="Search student name..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                         </div>
                     </div>
                 </div>
@@ -272,15 +235,12 @@ const Leaderboard = () => {
                                 <tr>
                                     <th className="py-5 px-4 text-center w-20 bg-gray-50">Rank</th>
                                     <th className="py-5 px-4 bg-gray-50">Student</th>
-                                    
                                     <th className="py-5 px-4 text-center cursor-pointer hover:bg-gray-100 bg-gray-50" onClick={() => handleSort('total_solved')}>
                                         <div className="flex items-center justify-center">Count <SortIcon active={sortConfig.key === 'total_solved'} direction={sortConfig.direction} /></div>
                                     </th>
-
                                     <th className="py-5 px-4 text-center cursor-pointer hover:bg-gray-100 bg-gray-50" onClick={() => handleSort('calculated_score')}>
                                         <div className="flex items-center justify-center">Score <SortIcon active={sortConfig.key === 'calculated_score'} direction={sortConfig.direction} /></div>
                                     </th>
-
                                     <th className="py-5 px-4 text-center bg-gray-50">LC</th>
                                     <th className="py-5 px-4 text-center bg-gray-50">CF</th>
                                     <th className="py-5 px-4 text-center bg-gray-50">CC</th>
@@ -290,32 +250,18 @@ const Leaderboard = () => {
                             </thead>
                             <tbody>
                                 {loading ? (
-                                    <tr><td colSpan="9" className="py-20 text-center text-gray-400">Loading rankings...</td></tr>
+                                    <tr><td colSpan="9" className="py-20 text-center text-gray-400 font-medium">Loading rankings...</td></tr>
                                 ) : processedUsers.length === 0 ? (
-                                    <tr><td colSpan="9" className="py-20 text-center text-gray-400">No students found matching filters.</td></tr>
+                                    <tr><td colSpan="9" className="py-20 text-center text-gray-400 font-medium">No students found.</td></tr>
                                 ) : (
                                     processedUsers.map((student, index) => (
-                                        <TableRow 
-                                            key={student.email || index} 
-                                            student={student} 
-                                            index={index} 
-                                            currentUserEmail={currentUserEmail}
-                                            getRatingColor={getRatingColor}
-                                        />
+                                        <TableRow key={student.email || index} student={student} index={index} currentUserEmail={currentUserEmail} />
                                     ))
                                 )}
                             </tbody>
-                            
-                            {/* Sticky Footer */}
                             {currentUserData && processedUsers.length > 0 && (
                                 <tfoot className="sticky bottom-0 z-40 shadow-[0_-5px_15px_-5px_rgba(0,0,0,0.1)]">
-                                    <TableRow 
-                                        student={currentUserData} 
-                                        index={processedUsers.findIndex(u => u.email === currentUserEmail)} 
-                                        isSticky={true} 
-                                        currentUserEmail={currentUserEmail}
-                                        getRatingColor={getRatingColor}
-                                    />
+                                    <TableRow student={currentUserData} index={users.findIndex(u => u.email === currentUserEmail)} isSticky={true} currentUserEmail={currentUserEmail} />
                                 </tfoot>
                             )}
                         </table>
