@@ -32,18 +32,22 @@ const TableRow = ({ student, index, isSticky, currentUserEmail, getRatingColor }
                 </div>
             </td>
 
-            {/* Student Name */}
+            {/* Student Name & Gmail DP */}
             <td className="py-4 px-4">
                 <div className="flex items-center gap-3">
-                    <div className={`h-10 w-10 rounded-full flex items-center justify-center text-sm font-bold text-white shadow-sm
-                        ${index === 0 ? 'bg-gradient-to-br from-yellow-400 to-orange-500' : 'bg-gradient-to-br from-blue-500 to-indigo-600'}
-                    `}>
-                        {student.name ? student.name.charAt(0).toUpperCase() : '?'}
-                    </div>
+                    {student.photo_url ? (
+                        <img src={student.photo_url} alt="" className="h-10 w-10 rounded-full border border-gray-100 shadow-sm object-cover" />
+                    ) : (
+                        <div className={`h-10 w-10 rounded-full flex items-center justify-center text-sm font-bold text-white shadow-sm
+                            ${index === 0 ? 'bg-gradient-to-br from-yellow-400 to-orange-500' : 'bg-gradient-to-br from-blue-500 to-indigo-600'}
+                        `}>
+                            {student.full_name ? student.full_name.charAt(0).toUpperCase() : '?'}
+                        </div>
+                    )}
                     <div className="flex flex-col">
                         <div className="flex items-center gap-2">
                             <span className="font-bold text-gray-800 group-hover:text-blue-700 transition-colors">
-                                {student.name || "Unknown"}
+                                {student.full_name || "Unknown"}
                             </span>
                             {isMe && <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-bold tracking-wider">YOU</span>}
                         </div>
@@ -54,38 +58,40 @@ const TableRow = ({ student, index, isSticky, currentUserEmail, getRatingColor }
                 </div>
             </td>
 
-            {/* Total Problems Solved (Count) */}
+            {/* Total Problems Solved (Corrected Key) */}
             <td className="py-4 px-4 text-center">
                 <span className="inline-block bg-gray-100 text-gray-700 px-2 py-1 rounded text-xs font-bold border border-gray-200">
-                    {parseInt(student.total_problems_solved || 0).toLocaleString()}
+                    {parseInt(student.total_solved || 0).toLocaleString()}
                 </span>
             </td>
 
-            {/* Weighted Score */}
+            {/* Weighted Score (Corrected Key) */}
             <td className="py-4 px-4 text-center">
                 <span className="font-black text-blue-600 text-base tracking-tight">
-                    {parseInt(student.total_score || 0).toLocaleString()}
+                    {parseInt(student.calculated_score || 0).toLocaleString()}
                 </span>
             </td>
 
-            {/* LeetCode */}
+            {/* Individual Platform Mappings (Optimized) */}
             <td className="py-4 px-4 text-center text-xs font-medium text-gray-600">
-                {student.lc_solved || 0}
+                {student.leetcode_count || '-'}
             </td>
             
-            {/* Codeforces */}
-            <td className="py-4 px-4 text-center">
-                {student.cf_rating > 0 ? (
-                    <span className={`px-2 py-1 rounded text-xs font-bold ${getRatingColor(student.cf_rating)} bg-opacity-10`}>
-                        {student.cf_rating}
-                    </span>
-                ) : <span className="text-gray-300">-</span>}
+            <td className="py-4 px-4 text-center text-xs font-medium text-gray-600">
+                {student.codeforces_count || '-'}
             </td>
 
-            {/* Other Platforms */}
-            <td className="py-4 px-4 text-center text-xs text-gray-600">{student.cc_rating || '-'}</td>
-            <td className="py-4 px-4 text-center text-xs text-gray-600">{student.hr_score || '-'}</td>
-            <td className="py-4 px-4 text-center text-xs text-gray-600">{student.gfg_score || '-'}</td>
+            <td className="py-4 px-4 text-center text-xs font-medium text-gray-600">
+                {student.codechef_count || '-'}
+            </td>
+
+            <td className="py-4 px-4 text-center text-xs font-medium text-gray-600">
+                {student.hackerrank_count || '-'}
+            </td>
+
+            <td className="py-4 px-4 text-center text-xs font-medium text-gray-600">
+                {student.gfg_count || '-'}
+            </td>
         </tr>
     );
 };
@@ -98,12 +104,11 @@ const Leaderboard = () => {
     const navigate = useNavigate();
     const auth = getAuth();
 
-    // --- FILTERS & SORTING STATE ---
     const [filterBranch, setFilterBranch] = useState('All');
     const [filterYear, setFilterYear] = useState('All');
     const [filterSem, setFilterSem] = useState('All');
     const [searchTerm, setSearchTerm] = useState('');
-    const [sortConfig, setSortConfig] = useState({ key: 'total_score', direction: 'desc' });
+    const [sortConfig, setSortConfig] = useState({ key: 'calculated_score', direction: 'desc' });
 
     const tableContainerRef = useRef(null);
 
@@ -112,7 +117,6 @@ const Leaderboard = () => {
             if (user) setCurrentUserEmail(user.email);
         });
 
-        // Fetch Data
         axios.get('/api/platforms/leaderboard')
             .then(res => {
                 const data = res.data.leaderboard || [];
@@ -126,9 +130,8 @@ const Leaderboard = () => {
             });
 
         return () => unsubscribe();
-    }, []);
+    }, [auth]);
 
-    // --- SORTING HANDLER ---
     const handleSort = (key) => {
         let direction = 'desc';
         if (sortConfig.key === key && sortConfig.direction === 'desc') {
@@ -137,17 +140,14 @@ const Leaderboard = () => {
         setSortConfig({ key, direction });
     };
 
-    // --- DATA PROCESSING (Filter -> Sort) ---
     const processedUsers = useMemo(() => {
         let result = [...users];
 
-        // 1. Filter
         if (filterBranch !== 'All') result = result.filter(u => u.branch === filterBranch);
         if (filterYear !== 'All') result = result.filter(u => u.year && u.year.toString() === filterYear);
         if (filterSem !== 'All') result = result.filter(u => u.semester && u.semester.toString() === filterSem);
-        if (searchTerm) result = result.filter(u => u.name && u.name.toLowerCase().includes(searchTerm.toLowerCase()));
+        if (searchTerm) result = result.filter(u => u.full_name && u.full_name.toLowerCase().includes(searchTerm.toLowerCase()));
 
-        // 2. Sort
         if (sortConfig.key) {
             result.sort((a, b) => {
                 const valA = parseInt(a[sortConfig.key] || 0);
@@ -190,30 +190,31 @@ const Leaderboard = () => {
                     </button>
                 </div>
 
-                {/* --- Coder of Week Card (Hidden if Search Active) --- */}
+                {/* --- Coder of Week Card --- */}
                 {coderOfWeek && !searchTerm && (
                     <div className="relative mb-10 overflow-hidden rounded-3xl bg-gradient-to-r from-violet-600 to-indigo-600 shadow-2xl shadow-indigo-200 transform hover:scale-[1.01] transition-transform duration-300">
-                        {/* Decorative background */}
                         <div className="absolute top-0 right-0 -mr-20 -mt-20 w-96 h-96 rounded-full bg-white opacity-10 blur-3xl"></div>
                         <div className="absolute bottom-0 left-0 -ml-20 -mb-20 w-72 h-72 rounded-full bg-indigo-400 opacity-20 blur-3xl"></div>
 
                         <div className="relative z-10 p-8 md:p-10 flex flex-col md:flex-row items-center gap-8 md:gap-12">
-                            {/* Avatar */}
                             <div className="relative">
-                                <div className="w-28 h-28 md:w-32 md:h-32 rounded-full bg-white border-4 border-white/20 shadow-2xl flex items-center justify-center text-4xl font-black text-indigo-600">
-                                    {coderOfWeek.name ? coderOfWeek.name.charAt(0).toUpperCase() : 'C'}
-                                </div>
+                                {coderOfWeek.photo_url ? (
+                                    <img src={coderOfWeek.photo_url} alt="" className="w-28 h-28 md:w-32 md:h-32 rounded-full border-4 border-white/20 shadow-2xl object-cover" />
+                                ) : (
+                                    <div className="w-28 h-28 md:w-32 md:h-32 rounded-full bg-white border-4 border-white/20 shadow-2xl flex items-center justify-center text-4xl font-black text-indigo-600">
+                                        {coderOfWeek.full_name ? coderOfWeek.full_name.charAt(0).toUpperCase() : 'C'}
+                                    </div>
+                                )}
                                 <div className="absolute -bottom-3 left-1/2 transform -translate-x-1/2 bg-yellow-400 text-yellow-900 text-xs font-bold px-3 py-1 rounded-full shadow-lg border border-yellow-200">
                                     #1 TOP RANK
                                 </div>
                             </div>
 
-                            {/* Details */}
                             <div className="text-center md:text-left flex-1 text-white">
                                 <div className="inline-block bg-indigo-500/30 backdrop-blur-md border border-indigo-400/30 px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-widest mb-3 text-indigo-100">
                                     Coder of the Week
                                 </div>
-                                <h2 className="text-3xl md:text-4xl font-bold mb-2">{coderOfWeek.name}</h2>
+                                <h2 className="text-3xl md:text-4xl font-bold mb-2">{coderOfWeek.full_name || coderOfWeek.name}</h2>
                                 <p className="text-indigo-200 font-medium text-lg mb-6">
                                     {coderOfWeek.branch} • Year {coderOfWeek.year}
                                 </p>
@@ -221,11 +222,11 @@ const Leaderboard = () => {
                                 <div className="flex flex-wrap justify-center md:justify-start gap-4">
                                     <div className="bg-white/10 px-5 py-3 rounded-2xl backdrop-blur-sm border border-white/10">
                                         <p className="text-xs text-indigo-200 uppercase font-bold tracking-wider">Total Score</p>
-                                        <p className="text-2xl font-black text-white">{parseInt(coderOfWeek.total_score).toLocaleString()}</p>
+                                        <p className="text-2xl font-black text-white">{parseInt(coderOfWeek.calculated_score || coderOfWeek.total_score || 0).toLocaleString()}</p>
                                     </div>
                                     <div className="bg-white/10 px-5 py-3 rounded-2xl backdrop-blur-sm border border-white/10">
                                         <p className="text-xs text-indigo-200 uppercase font-bold tracking-wider">Problems Solved</p>
-                                        <p className="text-2xl font-black text-white">{parseInt(coderOfWeek.total_problems_solved || 0).toLocaleString()}</p>
+                                        <p className="text-2xl font-black text-white">{parseInt(coderOfWeek.total_solved || 0).toLocaleString()}</p>
                                     </div>
                                 </div>
                             </div>
@@ -252,10 +253,6 @@ const Leaderboard = () => {
                                 <option value="3">3rd Year</option>
                                 <option value="4">4th Year</option>
                             </select>
-                            <select className="bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 outline-none font-medium" onChange={(e) => setFilterSem(e.target.value)}>
-                                <option value="All">All Semesters</option>
-                                {[1,2,3,4,5,6,7,8].map(s => <option key={s} value={s}>Sem {s}</option>)}
-                            </select>
                         </div>
 
                         <div className="relative w-full lg:w-96">
@@ -267,33 +264,27 @@ const Leaderboard = () => {
                     </div>
                 </div>
 
-                {/* --- MAIN TABLE (With Scroll Snap) --- */}
+                {/* --- MAIN TABLE --- */}
                 <div className="bg-white rounded-3xl shadow-sm border border-gray-200 overflow-hidden flex flex-col h-[65vh]">
-                    <div 
-                        className="overflow-y-auto flex-grow relative snap-y snap-mandatory scroll-pt-12" 
-                        ref={tableContainerRef}
-                    >
+                    <div className="overflow-y-auto flex-grow relative snap-y snap-mandatory scroll-pt-12" ref={tableContainerRef}>
                         <table className="w-full text-left border-collapse">
                             <thead className="bg-gray-50 text-gray-500 text-xs uppercase font-bold tracking-wider border-b border-gray-200 sticky top-0 z-10">
                                 <tr>
                                     <th className="py-5 px-4 text-center w-20 bg-gray-50">Rank</th>
                                     <th className="py-5 px-4 bg-gray-50">Student</th>
                                     
-                                    {/* Total Solved Header */}
-                                    <th className="py-5 px-4 text-center cursor-pointer hover:bg-gray-100 bg-gray-50" onClick={() => handleSort('total_problems_solved')}>
-                                        <div className="flex items-center justify-center">Count <SortIcon active={sortConfig.key === 'total_problems_solved'} direction={sortConfig.direction} /></div>
+                                    <th className="py-5 px-4 text-center cursor-pointer hover:bg-gray-100 bg-gray-50" onClick={() => handleSort('total_solved')}>
+                                        <div className="flex items-center justify-center">Count <SortIcon active={sortConfig.key === 'total_solved'} direction={sortConfig.direction} /></div>
                                     </th>
 
-                                    {/* Weighted Score Header */}
-                                    <th className="py-5 px-4 text-center cursor-pointer hover:bg-gray-100 bg-gray-50" onClick={() => handleSort('total_score')}>
-                                        <div className="flex items-center justify-center">Score <SortIcon active={sortConfig.key === 'total_score'} direction={sortConfig.direction} /></div>
+                                    <th className="py-5 px-4 text-center cursor-pointer hover:bg-gray-100 bg-gray-50" onClick={() => handleSort('calculated_score')}>
+                                        <div className="flex items-center justify-center">Score <SortIcon active={sortConfig.key === 'calculated_score'} direction={sortConfig.direction} /></div>
                                     </th>
 
-                                    {/* Platforms */}
-                                    <th className="py-5 px-4 text-center bg-gray-50">LeetCode</th>
-                                    <th className="py-5 px-4 text-center bg-gray-50">Codeforces</th>
-                                    <th className="py-5 px-4 text-center bg-gray-50">CodeChef</th>
-                                    <th className="py-5 px-4 text-center bg-gray-50">HackerRank</th>
+                                    <th className="py-5 px-4 text-center bg-gray-50">LC</th>
+                                    <th className="py-5 px-4 text-center bg-gray-50">CF</th>
+                                    <th className="py-5 px-4 text-center bg-gray-50">CC</th>
+                                    <th className="py-5 px-4 text-center bg-gray-50">HR</th>
                                     <th className="py-5 px-4 text-center bg-gray-50">GFG</th>
                                 </tr>
                             </thead>
@@ -315,7 +306,7 @@ const Leaderboard = () => {
                                 )}
                             </tbody>
                             
-                            {/* Sticky Footer for Current User */}
+                            {/* Sticky Footer */}
                             {currentUserData && processedUsers.length > 0 && (
                                 <tfoot className="sticky bottom-0 z-40 shadow-[0_-5px_15px_-5px_rgba(0,0,0,0.1)]">
                                     <TableRow 
@@ -330,7 +321,6 @@ const Leaderboard = () => {
                         </table>
                     </div>
                 </div>
-
             </div>
         </div>
     );
