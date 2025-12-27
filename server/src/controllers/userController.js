@@ -3,6 +3,21 @@ const db = require('../config/db');
 // @desc    Sync user data from Firebase to Postgres
 // @route   POST /api/users/sync
 // @access  Public (Secured by Frontend Token later)
+const getProfileByName = async (req, res) => {
+    const { name } = req.params;
+    try {
+        const query = 'SELECT full_name, avatar_url, branch, role FROM users WHERE full_name = $1';
+        const result = await db.query(query, [name]);
+        
+        if (result.rows.length > 0) {
+            res.status(200).json({ success: true, user: result.rows[0] });
+        } else {
+            res.status(404).json({ error: "User not found" });
+        }
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
 const syncUser = async (req, res) => {
     const { 
         firebase_uid, 
