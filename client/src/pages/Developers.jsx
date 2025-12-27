@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { getAuth } from 'firebase/auth'; 
-
+import myImage from "../assets/my1.jpg";
 const BACKEND_URL = "https://code-campus-v3.onrender.com";
 
 // --- ICONS ---
@@ -64,10 +64,9 @@ const Developers = () => {
                <div className="w-36 h-36 md:w-44 md:h-44 rounded-full border-[6px] border-white/20 shadow-2xl overflow-hidden bg-white/10 backdrop-blur-sm">
                   {/* Dynamic image from Neon database 'avatar_url' column */}
                   <img 
-                    src={devData?.avatar_url || `https://ui-avatars.com/api/?name=Ayush+Ojha&background=4F46E5&color=fff`} 
-                    alt={profileInfo.name} 
-                    className="w-full h-full object-cover"
-                    onError={(e) => { e.target.src = "https://ui-avatars.com/api/?name=Ayush+Ojha"; }}
+                    src={myImage}
+                    alt="Developer"
+                    className="w-40 h-40 rounded-full object-cover"
                   />
                </div>
             </div>
