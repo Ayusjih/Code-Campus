@@ -6,6 +6,7 @@ const Tasks = () => {
   const [tasks, setTasks] = useState([]);
   const [selectedTask, setSelectedTask] = useState(null);
   const [code, setCode] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const auth = getAuth();
 
   useEffect(() => {
@@ -19,6 +20,7 @@ const Tasks = () => {
   }, []);
 
   const handleSubmit = async () => {
+    setIsSubmitting(true);
     try {
         await axios.post('/api/tasks/submit', {
             firebase_uid: auth.currentUser.uid,
@@ -30,6 +32,8 @@ const Tasks = () => {
         setCode('');
     } catch (err) {
         alert("Submission failed.");
+    } finally {
+        setIsSubmitting(false);
     }
   };
 
@@ -41,7 +45,7 @@ const Tasks = () => {
 
         {selectedTask ? (
             // --- CODE EDITOR VIEW ---
-            <div className="bg-white rounded-2xl shadow-xl overflow-hidden flex flex-col md:flex-row h-[70vh]">
+            <div className="bg-white rounded-2xl shadow-xl overflow-hidden flex flex-col md:flex-row min-h-[70vh] md:h-[70vh]">
                 <div className="w-full md:w-1/3 p-6 bg-gray-50 border-r border-gray-200 overflow-y-auto">
                     <button onClick={() => setSelectedTask(null)} className="text-sm text-blue-600 font-bold mb-4">← Back to List</button>
                     <h2 className="text-2xl font-bold mb-2">{selectedTask.title}</h2>
@@ -56,7 +60,15 @@ const Tasks = () => {
                         onChange={(e) => setCode(e.target.value)}
                     ></textarea>
                     <div className="p-4 bg-gray-800 flex justify-end">
-                        <button onClick={handleSubmit} className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-bold">Submit Solution</button>
+                        <button 
+                            onClick={handleSubmit} 
+                            disabled={isSubmitting}
+                            className={`px-6 py-2 rounded-lg font-bold text-white transition-colors ${
+                                isSubmitting ? 'bg-green-800 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'
+                            }`}
+                        >
+                            {isSubmitting ? 'Submitting...' : 'Submit Solution'}
+                        </button>
                     </div>
                 </div>
             </div>

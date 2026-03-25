@@ -7,7 +7,7 @@ const TeacherDashboard = () => {
   const [submissions, setSubmissions] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
-    title: '', description: '', branch: 'CS', semester: '1'
+    title: '', description: '', branch: 'CSE', semester: '1'
   });
   const auth = getAuth();
 
@@ -117,7 +117,7 @@ const TeacherDashboard = () => {
                       className="w-full p-4 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-all duration-200"
                       onChange={(e) => setFormData({...formData, branch: e.target.value})}
                     >
-                      <option value="CS">Computer Science</option>
+                      <option value="CSE">Computer Science</option>
                       <option value="IT">Information Technology</option>
                       <option value="ME">Mechanical Engineering</option>
                       <option value="CIVIL">Civil Engineering</option>

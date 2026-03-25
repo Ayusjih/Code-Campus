@@ -18,7 +18,7 @@ const Register = () => {
   
   const [formData, setFormData] = useState({
     fullName: "", email: "", password: "", confirmPassword: "",
-    rollNumber: "", branch: "CS", year: "1", semester: "1",
+    rollNumber: "", branch: "CSE", year: "1", semester: "1",
     leetcode: "", codechef: "", codeforces: "", hackerrank: "", geeksforgeeks: ""
   });
 
@@ -138,7 +138,7 @@ const Register = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                 <div className="relative">
                     <select name="branch" className="glass-input appearance-none cursor-pointer" onChange={handleChange}>
-                        <option className="text-gray-900" value="CS">Computer Science</option>
+                        <option className="text-gray-900" value="CSE">Computer Science</option>
                         <option className="text-gray-900" value="IT">Information Tech</option>
                         <option className="text-gray-900" value="ME">Mechanical</option>
                         <option className="text-gray-900" value="CIVIL">Civil</option>

@@ -54,7 +54,7 @@ const TableRow = ({ student, index, isSticky, currentUserEmail }) => {
             {student.avatar_url ? (
               <img
                 src={student.avatar_url}
-                alt={student.full_name}
+                alt={student.name || 'avatar'}
                 className="h-full w-full object-cover"
                 onError={(e) => {
                   e.currentTarget.src = '/default-avatar.png';
@@ -62,7 +62,7 @@ const TableRow = ({ student, index, isSticky, currentUserEmail }) => {
               />
             ) : (
               <div className="h-full w-full flex items-center justify-center text-sm font-bold text-white bg-gradient-to-br from-blue-500 to-indigo-600">
-                {student.full_name?.charAt(0)?.toUpperCase() || '?'}
+                {(student.name || '?').charAt(0).toUpperCase()}
               </div>
             )}
           </div>
@@ -70,7 +70,7 @@ const TableRow = ({ student, index, isSticky, currentUserEmail }) => {
           <div className="flex flex-col">
             <div className="flex items-center gap-2">
               <span className="font-bold text-gray-800">
-                {student.full_name || 'Unknown'}
+                {student.name || 'Unknown'}
               </span>
               {isMe && (
                 <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-bold">
@@ -79,7 +79,7 @@ const TableRow = ({ student, index, isSticky, currentUserEmail }) => {
               )}
             </div>
             <span className="text-xs text-gray-400 font-medium">
-              {student.branch} • Year {student.year}
+              {student.branch || 'N/A'} • Year {student.year || 'N/A'}
             </span>
           </div>
         </div>
@@ -88,19 +88,19 @@ const TableRow = ({ student, index, isSticky, currentUserEmail }) => {
       {/* Stats */}
       <td className="py-4 px-4 text-center">
         <span className="bg-gray-100 px-2 py-1 rounded text-xs font-bold">
-          {student.total_solved || 0}
+          {student.total_problems_solved || 0}
         </span>
       </td>
 
       <td className="py-4 px-4 text-center font-black text-blue-600">
-        {student.calculated_score || 0}
+        {Math.round(student.total_score || 0)}
       </td>
 
-      <td className="py-4 px-4 text-center">{student.leetcode_count || '-'}</td>
-      <td className="py-4 px-4 text-center">{student.codeforces_count || '-'}</td>
-      <td className="py-4 px-4 text-center">{student.codechef_count || '-'}</td>
-      <td className="py-4 px-4 text-center">{student.hackerrank_count || '-'}</td>
-      <td className="py-4 px-4 text-center">{student.gfg_count || '-'}</td>
+      <td className="py-4 px-4 text-center">{student.lc_solved || '-'}</td>
+      <td className="py-4 px-4 text-center">{student.cf_rating > 0 ? student.cf_rating : '-'}</td>
+      <td className="py-4 px-4 text-center">{student.cc_rating > 0 ? student.cc_rating : '-'}</td>
+      <td className="py-4 px-4 text-center">{student.hr_score > 0 ? student.hr_score : '-'}</td>
+      <td className="py-4 px-4 text-center">{student.gfg_score > 0 ? student.gfg_score : '-'}</td>
     </tr>
   );
 };
@@ -110,6 +110,9 @@ const Leaderboard = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentUserEmail, setCurrentUserEmail] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [branchFilter, setBranchFilter] = useState('');
+  const [yearFilter, setYearFilter] = useState('');
   const navigate = useNavigate();
   const auth = getAuth();
 
@@ -128,14 +131,60 @@ const Leaderboard = () => {
     return () => unsub();
   }, [auth]);
 
+  const filteredUsers = useMemo(() => {
+    return users.filter(u => {
+      const nameMatch = (u.name || '').toLowerCase().includes(searchTerm.toLowerCase());
+      const branchMatch = branchFilter ? u.branch === branchFilter : true;
+      const yearMatch = yearFilter ? String(u.year) === String(yearFilter) : true;
+      return nameMatch && branchMatch && yearMatch;
+    });
+  }, [users, searchTerm, branchFilter, yearFilter]);
+
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
-      <button
-        onClick={() => navigate('/dashboard')}
-        className="mb-4 bg-white border px-4 py-2 rounded"
-      >
-        ← Back
-      </button>
+      <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+        <button
+          onClick={() => navigate('/dashboard')}
+          className="bg-white border px-4 py-2 rounded shadow-sm hover:bg-gray-50 font-medium self-start"
+        >
+          ← Back
+        </button>
+        
+        {/* FILTERS AND SEARCH */}
+        <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+          <input
+            type="text"
+            placeholder="Search by name..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none shadow-sm flex-1 md:w-64"
+          />
+          <select
+            value={branchFilter}
+            onChange={(e) => setBranchFilter(e.target.value)}
+            className="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none shadow-sm bg-white"
+          >
+            <option value="">All Branches</option>
+            <option value="CSE">Computer Science</option>
+            <option value="IT">Information Tech</option>
+            <option value="AIML">AI & ML</option>
+            <option value="ME">Mechanical</option>
+            <option value="CIVIL">Civil</option>
+            <option value="IOT">IoT</option>
+          </select>
+          <select
+            value={yearFilter}
+            onChange={(e) => setYearFilter(e.target.value)}
+            className="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none shadow-sm bg-white"
+          >
+            <option value="">All Years</option>
+            <option value="1">1st Year</option>
+            <option value="2">2nd Year</option>
+            <option value="3">3rd Year</option>
+            <option value="4">4th Year</option>
+          </select>
+        </div>
+      </div>
 
       <div className="bg-white rounded-xl shadow overflow-hidden">
         <table className="w-full">
@@ -156,12 +205,16 @@ const Leaderboard = () => {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan="9" className="text-center p-10">Loading...</td>
+                <td colSpan="9" className="text-center p-10 font-bold text-gray-500">Loading Leaderboard...</td>
+              </tr>
+            ) : filteredUsers.length === 0 ? (
+              <tr>
+                <td colSpan="9" className="text-center p-10 font-bold text-gray-500">No users found.</td>
               </tr>
             ) : (
-              users.map((u, i) => (
+              filteredUsers.map((u, i) => (
                 <TableRow
-                  key={u.email}
+                  key={u.email || i}
                   student={u}
                   index={i}
                   currentUserEmail={currentUserEmail}

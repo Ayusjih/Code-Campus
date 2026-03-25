@@ -24,7 +24,9 @@ ChartJS.register(
 
 const ActivityGraph = ({ dataPoints }) => {
   // If no data, use defaults
-  const data = dataPoints || [0, 0, 0, 0, 0, 0, 0];
+  const data = (dataPoints && dataPoints.length > 0) 
+    ? dataPoints 
+    : Array(7).fill({ solved: 0 });
 
   const chartData = {
     labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],

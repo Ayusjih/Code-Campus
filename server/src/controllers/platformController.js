@@ -173,8 +173,8 @@ const getDashboardStats = async (req, res) => {
         
         if (userStats.rows.length === 0) return res.status(404).json({ error: 'User not found' });
 
-        const myTotal = parseInt(userStats.rows[0].total_problems);
-        const myPlatformCount = parseInt(userStats.rows[0].platform_count);
+        const myTotal = parseInt(userStats.rows[0].total_problems) || 0;
+        const myPlatformCount = parseInt(userStats.rows[0].platform_count) || 0;
         
         // 2. Rank Calculation
         const rankResult = await db.query(

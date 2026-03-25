@@ -1,0 +1,13 @@
+--- Testing CodeChef (tourist) ---
+{
+  "handle": "tourist",
+  "rating": 3355,
+  "stars": "Unrated",
+  "globalRank": 0,
+  "problemsSolved": 632,
+  "profileUrl": "https://www.codechef.com/users/tourist",
+  "fetchedAt": "2026-03-22T09:53:02.552Z"
+}
+
+--- Testing GFG (sandeep.jain) ---
+null

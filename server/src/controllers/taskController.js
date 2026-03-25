@@ -1,8 +1,10 @@
 const db = require('../config/db');
+const { normalizeBranch } = require('../utils/normalizer');
 
 // @desc    Create a new Task (Teacher Only)
 const createTask = async (req, res) => {
-    const { firebase_uid, title, description, branch, semester } = req.body;
+    let { firebase_uid, title, description, branch, semester } = req.body;
+    branch = normalizeBranch(branch);
 
     try {
         // 1. Verify Teacher Role
@@ -36,7 +38,8 @@ const getStudentTasks = async (req, res) => {
         const studentRes = await db.query('SELECT id, branch, semester FROM users WHERE firebase_uid = $1', [firebase_uid]);
         if (studentRes.rows.length === 0) return res.status(404).json({ error: "User not found" });
         
-        const { branch, semester } = studentRes.rows[0];
+        const { semester } = studentRes.rows[0];
+        const studentBranch = normalizeBranch(studentRes.rows[0].branch);
 
         // 2. Fetch Tasks matching Branch & Sem AND are NOT expired
         const tasks = await db.query(
@@ -47,7 +50,7 @@ const getStudentTasks = async (req, res) => {
              AND t.target_semester = $2
              AND t.created_at > NOW() - INTERVAL '24 HOURS' -- The 24hr Logic
              ORDER BY t.created_at DESC`,
-            [branch, semester]
+            [studentBranch, semester]
         );
 
         res.json(tasks.rows);

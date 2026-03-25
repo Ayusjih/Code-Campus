@@ -1,4 +1,5 @@
 const db = require('../config/db');
+const { normalizeBranch, sanitizeInput } = require('../utils/normalizer');
 
 // @desc    Sync user data from Firebase to Postgres
 // @route   POST /api/users/sync
@@ -19,7 +20,7 @@ const getProfileByName = async (req, res) => {
     }
 };
 const syncUser = async (req, res) => {
-    const { 
+    let { 
         firebase_uid, 
         email, 
         full_name, 
@@ -29,6 +30,11 @@ const syncUser = async (req, res) => {
         semester, 
         enrollment_number // <--- This is the Roll Number
     } = req.body;
+
+    full_name = sanitizeInput(full_name);
+    email = sanitizeInput(email);
+    enrollment_number = sanitizeInput(enrollment_number);
+    branch = normalizeBranch(branch);
 
     try {
         // 1. Check if user exists
@@ -81,7 +87,10 @@ const syncUser = async (req, res) => {
 // @desc    Update user profile (Enrollment, Branch, etc.)
 // @route   PUT /api/users/profile
 const updateProfile = async (req, res) => {
-    const { firebase_uid, enrollment_number, branch, semester } = req.body;
+    let { firebase_uid, enrollment_number, branch, semester } = req.body;
+    
+    enrollment_number = sanitizeInput(enrollment_number);
+    branch = normalizeBranch(branch);
 
     try {
         const updatedUser = await db.query(
