@@ -20,6 +20,12 @@ const EditProfile = () => {
     HackerRank: ''
   });
 
+  const [academicData, setAcademicData] = useState({
+    branch: '',
+    semester: '',
+    enrollment_number: ''
+  });
+
   // Load existing data (Handles + Role + Visibility)
   useEffect(() => {
     const fetchData = async () => {
@@ -39,11 +45,11 @@ const EditProfile = () => {
             setIsHidden(visRes.data.is_hidden);
         }
 
-        // 3. Fetch Current Platform Handles
-        const res = await axios.get(`/api/platforms/${uid}`);
+        // 3. Fetch User Profile & Platform Handles
+        const res = await axios.get(`/api/platforms/profile/${uid}`);
         const currentData = { ...formData };
         
-        res.data.forEach(p => {
+        res.data.platforms.forEach(p => {
           // Ensure the platform name matches our keys (case-sensitive)
           const key = p.platform_name; 
           if (currentData.hasOwnProperty(key)) {
@@ -51,6 +57,12 @@ const EditProfile = () => {
           }
         });
         setFormData(currentData);
+        
+        setAcademicData({
+          branch: res.data.user.branch || '',
+          semester: res.data.user.semester || '',
+          enrollment_number: res.data.user.enrollment_number || ''
+        });
         setLoading(false);
 
       } catch (error) {
@@ -65,6 +77,28 @@ const EditProfile = () => {
   // Handle Input Changes
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleAcademicChange = (e) => {
+    setAcademicData({ ...academicData, [e.target.name]: e.target.value });
+  };
+
+  const handleSaveAcademic = async () => {
+    setLoading(true);
+    const user = auth.currentUser;
+    if (!user) return;
+    try {
+      await axios.put('/api/users/profile', {
+        firebase_uid: user.uid,
+        ...academicData
+      });
+      alert('Academic Info Updated Successfully!');
+    } catch (err) {
+      console.error(err);
+      alert('Failed to update academic info.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Toggle Visibility (Teacher Only)
@@ -145,10 +179,10 @@ const EditProfile = () => {
             Edit Platforms
           </button>
           <button 
-            className="px-6 py-4 font-medium text-sm text-gray-400 cursor-not-allowed"
-            disabled
+            className={`px-6 py-4 font-medium text-sm ${activeTab === 'academic' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+            onClick={() => setActiveTab('academic')}
           >
-            Academic Info (Coming Soon)
+            Academic Info
           </button>
         </div>
 
@@ -221,6 +255,54 @@ const EditProfile = () => {
                                 ${loading ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}
                         >
                             {loading ? 'Validating & Fetching Data...' : 'Save Profiles'}
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {activeTab === 'academic' && (
+                <div className="space-y-6">
+                    <div className="text-center mb-8">
+                        <h2 className="text-xl font-semibold text-gray-800">Academic Information</h2>
+                        <p className="text-gray-500 text-sm mt-1">Update your branch and semester for the leaderboard filters.</p>
+                    </div>
+
+                    <div className="space-y-4 max-w-2xl mx-auto">
+                        <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Branch</label>
+                            <select name="branch" value={academicData.branch} onChange={handleAcademicChange} className="w-full bg-white border border-gray-300 rounded px-3 py-2 focus:outline-none focus:border-blue-500">
+                                <option value="">Select Branch</option>
+                                <option value="CSE">Computer Science</option>
+                                <option value="IT">Information Tech</option>
+                                <option value="AIML">AI & ML</option>
+                                <option value="ME">Mechanical</option>
+                                <option value="CIVIL">Civil</option>
+                                <option value="IOT">IoT</option>
+                            </select>
+                        </div>
+
+                        <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Semester</label>
+                            <select name="semester" value={academicData.semester} onChange={handleAcademicChange} className="w-full bg-white border border-gray-300 rounded px-3 py-2 focus:outline-none focus:border-blue-500">
+                                <option value="">Select Semester</option>
+                                {[1, 2, 3, 4, 5, 6, 7, 8].map(sem => (
+                                    <option key={sem} value={sem}>Semester {sem}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Enrollment Number</label>
+                            <input type="text" name="enrollment_number" value={academicData.enrollment_number} onChange={handleAcademicChange} placeholder="e.g. 094xxx..." className="w-full bg-white border border-gray-300 rounded px-3 py-2 focus:outline-none focus:border-blue-500" />
+                        </div>
+
+                        <button 
+                            onClick={handleSaveAcademic}
+                            disabled={loading}
+                            className={`w-full mt-6 py-3 rounded-lg text-white font-semibold transition-colors
+                                ${loading ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}
+                        >
+                            {loading ? 'Saving...' : 'Save Academic Info'}
                         </button>
                     </div>
                 </div>

@@ -5,7 +5,7 @@ import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
 import './index.css'
 import './firebase';
-axios.defaults.baseURL = 'https://code-campus-v3.onrender.com';
+axios.defaults.baseURL = 'http://localhost:5000';
 import { BrowserRouter } from 'react-router-dom' // Import BrowserRouter
 
 

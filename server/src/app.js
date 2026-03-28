@@ -6,6 +6,7 @@ const userRoutes = require('./routes/userRoutes');
 const platformRoutes = require('./routes/platformRoutes'); // <--- Import
 const developerRoutes = require('./routes/developerRoutes');
 const taskRoutes = require('./routes/taskRoutes');
+const branchRoutes = require('./routes/branchRoutes');
 const compression = require('compression');
 
 // Load env variables
@@ -19,11 +20,25 @@ app.use(cors());
 app.use(compression());
 app.use(express.json());
 
+// Normalize branch inputs globally before reaching controllers
+app.use((req, res, next) => {
+    if (req.body) {
+        if (typeof req.body.branch === 'string') {
+            req.body.branch = req.body.branch.trim().toUpperCase();
+        }
+        if (typeof req.body.target_branch === 'string') {
+            req.body.target_branch = req.body.target_branch.trim().toUpperCase();
+        }
+    }
+    next();
+});
+
 // Routes
 app.use('/api/users', userRoutes);
 app.use('/api/platforms', platformRoutes); // <--- Use
 app.use('/api/developer', developerRoutes);
 app.use('/api/tasks', taskRoutes);
+app.use('/api/branches', branchRoutes);
 
 // Health Check
 app.get('/', async (req, res) => {

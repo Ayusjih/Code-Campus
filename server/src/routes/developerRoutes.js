@@ -4,22 +4,22 @@ const router = express.Router();
 const { developerLogin } = require('../controllers/developerContentController'); // Example, adjust import if needed
 const devController = require('../controllers/developerContentController');
 
-// --- PUBLIC ROUTE (Login Check) ---
+// --- PUBLIC ROUTES ---
 router.post('/login', devController.developerLogin); // Existing login route
+
+// READ: Get all content for public display (No token required)
+router.get('/content', devController.getDevContent);
 
 // --- PROTECTED CRUD ROUTES ---
 
 // All these routes should use the token verification middleware (ensureDevToken)
-router.use(devController.ensureDevToken); 
-
-// READ: Get all content for public display/editing
-router.get('/content', devController.getDevContent); 
+router.use(devController.ensureDevToken);
 
 
 // WRITE: Update a specific section's entire content array (used by the dashboard editor's save function)
-router.post('/content/update', devController.updateDevContent); 
+router.post('/content/update', devController.updateDevContent);
 
 // DELETE: Delete a single item by index from an array section
-router.delete('/content/:section/:index', devController.deleteDevItem); 
+router.delete('/content/:section/:index', devController.deleteDevItem);
 
 module.exports = router;

@@ -15,7 +15,7 @@ const Icons = {
 };
 
 // --- API BASE (Use local for development) ---
-const API_BASE_URL = 'https://code-campus-v3.onrender.com'; // Corrected API base
+const API_BASE_URL = 'http://localhost:5000'; // Corrected API base
 
 const DeveloperDashboard = () => {
   const navigate = useNavigate();
@@ -40,28 +40,15 @@ const DeveloperDashboard = () => {
         return;
       }
       
-      // 2. Fetch data from backend (Requires BE implementation)
-      // NOTE: For now, we will use the fallback data since the BE endpoints are complex.
-      // const response = await axios.get(`${API_BASE_URL}/api/developer/data`, {
-      //   headers: { Authorization: `Bearer ${token}` }
-      // });
-      // setDeveloperData(response.data);
+      // 2. Fetch data from backend
+      const response = await axios.get(`${API_BASE_URL}/api/developer/content`);
       
-      // --- FALLBACK DATA (For quick development) ---
+      // Ensure defaults for all sections
       setDeveloperData({
-        education: [
-          { institution: "ITM Gwalior", degree: "B. Tech in IT", duration: "2021 - 2025", cgpa: "7.9/10", enrollment: "ITM Student", department: "Information Technology" },
-          { institution: "Miss Hill School", degree: "Class 12 (CBSE)", duration: "Completed 2023", cgpa: "78%", enrollment: "School Student", department: "Science/Maths" }
-        ],
-        projects: [
-          { title: "Google Cloud GenAI Intern", description: "Completed virtual internships focusing on Generative AI.", category: "Internship", link: "https://www.linkedin.com/in/ayush-ojha-447048344/", dates: "Jan-Feb & Apr-May 2025" },
-          { title: "Online Quiz System", description: "Built using Advanced Java.", category: "Full Stack Java", link: "https://github.com/Ayusjih", dates: "Academic Project" },
-          { title: "Safety Chrome Extension", description: "Browser extension for web surfing safety.", category: "Cybersecurity", link: "https://github.com/Ayusjih", dates: "Extension" }
-        ],
-        achievements: ["Rank 1 (Winner): Hack-Arena Hackathon", "Rank 2: Cybersecurity Hackathon", "Successfully captained high-performing team"],
-        guidance: [
-          { source: "ITM Gwalior Faculty", description: "Academic Mentors", email: "admin@itmgwalior.ac.in", role: "Academic Mentors" }
-        ]
+        education: response.data.education || [],
+        projects: response.data.projects || [],
+        achievements: response.data.achievements || [],
+        guidance: response.data.guidance || []
       });
       
     } catch (error) {
@@ -78,23 +65,26 @@ const DeveloperDashboard = () => {
   const addItem = async (section) => {
     try {
       const token = localStorage.getItem('developerToken');
-      // Prepare data (using spread to ensure all fields are sent)
       let itemToSend = { ...newItem };
+      const updatedSection = isStringArray(section) ? [...developerData[section], newItem.text] : [...developerData[section], itemToSend];
 
-      // API call to create new item (NOTE: Backend implementation required)
-      // await axios.post(`${API_BASE_URL}/api/developer/data/${section}`, itemToSend, {
-      //   headers: { Authorization: `Bearer ${token}` }
-      // });
+      // API call to create new item by replacing the entire section content
+      await axios.post(`${API_BASE_URL}/api/developer/content/update`, {
+        section,
+        content: updatedSection
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       
-      // OPTIMISTIC UPDATE (For Dev): Append item to local data immediately
+      // OPTIMISTIC UPDATE
       setDeveloperData(prev => ({
         ...prev,
-        [section]: isStringArray(section) ? [...prev[section], newItem.text] : [...prev[section], newItem]
+        [section]: updatedSection
       }));
       
       setNewItem({});
       setActiveSection(null);
-      setMessage('✅ Item added successfully (Local)!');
+      setMessage('✅ Item added successfully!');
       setTimeout(() => setMessage(''), 3000);
     } catch (error) {
       setMessage('❌ Error adding item: ' + error.message);
@@ -106,18 +96,23 @@ const DeveloperDashboard = () => {
 
     try {
       const token = localStorage.getItem('developerToken');
-      // API call to delete (NOTE: Backend implementation required)
-      // await axios.delete(`${API_BASE_URL}/api/developer/data/${section}/${index}`, {
-      //   headers: { Authorization: `Bearer ${token}` }
-      // });
+      const updatedSection = developerData[section].filter((_, i) => i !== index);
+
+      // API call to delete by updating the section
+      await axios.post(`${API_BASE_URL}/api/developer/content/update`, {
+        section,
+        content: updatedSection
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       
-      // OPTIMISTIC UPDATE (For Dev): Filter item from local data immediately
+      // OPTIMISTIC UPDATE
       setDeveloperData(prev => ({
         ...prev,
-        [section]: prev[section].filter((_, i) => i !== index)
+        [section]: updatedSection
       }));
       
-      setMessage('🗑️ Item deleted successfully (Local)!');
+      setMessage('🗑️ Item deleted successfully!');
       setTimeout(() => setMessage(''), 3000);
     } catch (error) {
       setMessage('❌ Error deleting item: ' + error.message);

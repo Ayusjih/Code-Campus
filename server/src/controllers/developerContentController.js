@@ -2,7 +2,7 @@ const db = require('../config/db');
 const jwt = require('jsonwebtoken'); // npm install jsonwebtoken
 
 // Config
-const DEVELOPER_KEY = process.env.DEV_LOGIN_USER || 'dev_ayush'; 
+const DEVELOPER_KEY = process.env.DEV_LOGIN_USER || 'dev_ayush';
 const DEV_PASS = process.env.DEV_LOGIN_PASS || 'default_secret';
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
 
@@ -40,7 +40,7 @@ const ensureDevToken = (req, res, next) => {
 const getDevContent = async (req, res) => {
     try {
         const result = await db.query(
-            "SELECT section, content FROM developer_content WHERE developer_user_id = $1", 
+            "SELECT section, content FROM developer_content WHERE developer_user_id = $1",
             [DEVELOPER_KEY]
         );
         // Convert rows to object: { projects: [], education: [] }
@@ -79,7 +79,7 @@ const deleteDevItem = async (req, res) => {
     // But if you need specific delete endpoint:
     const { section, index } = req.params;
     // ... logic to fetch, splice, and update ...
-    res.json({ message: 'Delete implementation pending' }); 
+    res.json({ message: 'Delete implementation pending' });
 };
 
 module.exports = {

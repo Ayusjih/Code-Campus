@@ -113,6 +113,7 @@ const Leaderboard = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [branchFilter, setBranchFilter] = useState('');
   const [yearFilter, setYearFilter] = useState('');
+  const [semesterFilter, setSemesterFilter] = useState('');
   const navigate = useNavigate();
   const auth = getAuth();
 
@@ -133,12 +134,13 @@ const Leaderboard = () => {
 
   const filteredUsers = useMemo(() => {
     return users.filter(u => {
-      const nameMatch = (u.name || '').toLowerCase().includes(searchTerm.toLowerCase());
+      const nameMatch = (u.name || '').toLowerCase().includes(searchTerm.trim().toLowerCase());
       const branchMatch = branchFilter ? u.branch === branchFilter : true;
       const yearMatch = yearFilter ? String(u.year) === String(yearFilter) : true;
-      return nameMatch && branchMatch && yearMatch;
+      const semesterMatch = semesterFilter ? String(u.semester) === String(semesterFilter) : true;
+      return nameMatch && branchMatch && yearMatch && semesterMatch;
     });
-  }, [users, searchTerm, branchFilter, yearFilter]);
+  }, [users, searchTerm, branchFilter, yearFilter, semesterFilter]);
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
@@ -182,6 +184,16 @@ const Leaderboard = () => {
             <option value="2">2nd Year</option>
             <option value="3">3rd Year</option>
             <option value="4">4th Year</option>
+          </select>
+          <select
+            value={semesterFilter}
+            onChange={(e) => setSemesterFilter(e.target.value)}
+            className="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none shadow-sm bg-white"
+          >
+            <option value="">All Semesters</option>
+            {[1, 2, 3, 4, 5, 6, 7, 8].map(sem => (
+              <option key={sem} value={sem}>Semester {sem}</option>
+            ))}
           </select>
         </div>
       </div>

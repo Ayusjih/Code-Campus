@@ -92,13 +92,21 @@ const updateProfile = async (req, res) => {
     enrollment_number = sanitizeInput(enrollment_number);
     branch = normalizeBranch(branch);
 
+    // Postgres will crash if we try to insert '' into an INTEGER column.
+    // We safely parse empty fields to `null`.
+    const parsedSemester = (semester === '' || semester === undefined || isNaN(semester)) ? null : parseInt(semester, 10);
+    
+    // An empty branch string '' will violate Foreign Key constraints against the `branches` table
+    const parsedBranch = branch === '' ? null : branch;
+    const parsedEnrollment = enrollment_number === '' ? null : enrollment_number;
+
     try {
         const updatedUser = await db.query(
             `UPDATE users 
              SET enrollment_number = $1, branch = $2, semester = $3, updated_at = NOW()
              WHERE firebase_uid = $4
              RETURNING *`,
-            [enrollment_number, branch, semester, firebase_uid]
+            [parsedEnrollment, parsedBranch, parsedSemester, firebase_uid]
         );
 
         if (updatedUser.rows.length === 0) {

@@ -17,18 +17,18 @@ const Register = () => {
   const [loading, setLoading] = useState(false);
   
   const [formData, setFormData] = useState({
-    fullName: "", email: "", password: "", confirmPassword: "",
-    rollNumber: "", branch: "CSE", year: "1", semester: "1",
+    full_name: "", email: "", password: "", confirmPassword: "",
+    enrollment_number: "", branch: "CSE", academic_year: "1", semester: "1",
     leetcode: "", codechef: "", codeforces: "", hackerrank: "", geeksforgeeks: ""
   });
 
   const [semOptions, setSemOptions] = useState([1, 2]);
 
   useEffect(() => {
-    const y = parseInt(formData.year);
+    const y = parseInt(formData.academic_year);
     setSemOptions([(y * 2) - 1, y * 2]);
     setFormData(prev => ({ ...prev, semester: (y * 2) - 1 }));
-  }, [formData.year]);
+  }, [formData.academic_year]);
 
   const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
 
@@ -43,15 +43,15 @@ const Register = () => {
       const user = userCredential.user;
       
       await sendEmailVerification(user);
-      await updateProfile(user, { displayName: formData.fullName });
+      await updateProfile(user, { displayName: formData.full_name });
 
       await axios.post("/api/users/sync", {
         firebase_uid: user.uid,
         email: user.email,
-        full_name: formData.fullName,
-        enrollment_number: formData.rollNumber,
+        full_name: formData.full_name,
+        enrollment_number: formData.enrollment_number,
         branch: formData.branch,
-        academic_year: parseInt(formData.year),
+        academic_year: parseInt(formData.academic_year),
         semester: parseInt(formData.semester)
       });
 
@@ -118,8 +118,8 @@ const Register = () => {
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <input name="fullName" placeholder="Full Name" required className="glass-input" onChange={handleChange} />
-              <input name="rollNumber" placeholder="Roll Number" required className="glass-input" onChange={handleChange} />
+              <input name="full_name" placeholder="Full Name" required className="glass-input" onChange={handleChange} />
+              <input name="enrollment_number" placeholder="Roll Number" required className="glass-input" onChange={handleChange} />
               <input name="email" type="email" placeholder="Email Address" required className="glass-input md:col-span-2" onChange={handleChange} />
               <input name="password" type="password" placeholder="Password" required className="glass-input" onChange={handleChange} />
               <input name="confirmPassword" type="password" placeholder="Confirm Password" required className="glass-input" onChange={handleChange} />
@@ -147,7 +147,7 @@ const Register = () => {
                     </select>
                 </div>
                 <div className="relative">
-                    <select name="year" className="glass-input appearance-none cursor-pointer" onChange={handleChange}>
+                    <select name="academic_year" className="glass-input appearance-none cursor-pointer" onChange={handleChange}>
                         <option className="text-gray-900" value="1">1st Year</option>
                         <option className="text-gray-900" value="2">2nd Year</option>
                         <option className="text-gray-900" value="3">3rd Year</option>

@@ -1,30 +1,40 @@
 const { Pool } = require('pg');
 const dotenv = require('dotenv');
 
-dotenv.config();
+// Load environment variables
+dotenv.config({ path: '.env.local' });
 
+// Debug logs (remove later)
+console.log("CWD:", process.cwd());
+console.log("DB URL:", process.env.DATABASE_URL);
+
+if (!process.env.DATABASE_URL) {
+    console.error("❌ DATABASE_URL is missing. Check .env.local file location.");
+    process.exit(1);
+}
+
+// Create pool
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: {
-        rejectUnauthorized: false // Required for Neon DB connections
-    },
-    // --- POOLING OPTIMIZATIONS ---
-    max: 10,                  // Limit total connections to 10 (Safe for Neon Free Tier)
-    idleTimeoutMillis: 30000, // Close connections that have been idle for 30s
-    connectionTimeoutMillis: 2000, // Return an error if a connection takes > 2s to establish
+        rejectUnauthorized: false
+    }
 });
 
-// Test the connection immediately when this file is loaded
+// Test connection
 pool.connect((err, client, release) => {
     if (err) {
-        return console.error('Error acquiring client', err.stack);
+        return console.error('❌ DB Connection Error:', err.message);
     }
+
     client.query('SELECT NOW()', (err, result) => {
-        release(); // Release the client back to the pool
+        release();
+
         if (err) {
-            return console.error('Error executing query', err.stack);
+            return console.error('❌ Query Error:', err.stack);
         }
-        console.log('✅ Connected to Neon PostgreSQL Database');
+
+        console.log('✅ Connected to Supabase PostgreSQL');
     });
 });
 
