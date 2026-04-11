@@ -3,7 +3,7 @@ import axios from "axios";
 import myImage from "../assets/my1.jpg";
 import { Github, Linkedin, Mail } from "lucide-react";
 
-const BACKEND_URL = "http://localhost:5000";
+const BACKEND_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:5000' : 'https://codecampusbacnend.onrender.com');
 
 const Developers = () => {
   const [devData, setDevData] = useState(null);
