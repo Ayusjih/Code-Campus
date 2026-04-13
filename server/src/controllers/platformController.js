@@ -103,6 +103,7 @@ const getLeaderboard = async (req, res) => {
         const query = `
             SELECT 
                 u.full_name as name,
+                u.avatar_url,
                 u.branch,
                 u.academic_year as year,
                 u.semester,
@@ -135,7 +136,7 @@ const getLeaderboard = async (req, res) => {
             
             WHERE u.is_hidden = FALSE
             
-            GROUP BY u.id, u.full_name, u.branch, u.academic_year, u.semester, u.email
+            GROUP BY u.id, u.full_name, u.avatar_url, u.branch, u.academic_year, u.semester, u.email
             
             ORDER BY total_score DESC
             LIMIT 50;

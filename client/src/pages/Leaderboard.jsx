@@ -20,6 +20,7 @@ const SortIcon = ({ active, direction }) => (
 /* ---------- TABLE ROW ---------- */
 const TableRow = ({ student, index, isSticky, currentUserEmail }) => {
   const isMe = student.email === currentUserEmail;
+  const [imgError, setImgError] = useState(false);
 
   return (
     <tr
@@ -51,14 +52,12 @@ const TableRow = ({ student, index, isSticky, currentUserEmail }) => {
       <td className="py-4 px-4">
         <div className="flex items-center gap-3">
           <div className="h-10 w-10 rounded-full overflow-hidden border bg-gray-200 flex-shrink-0">
-            {student.avatar_url ? (
+            {student.avatar_url && !imgError ? (
               <img
                 src={student.avatar_url}
                 alt={student.name || 'avatar'}
                 className="h-full w-full object-cover"
-                onError={(e) => {
-                  e.currentTarget.src = '/default-avatar.png';
-                }}
+                onError={() => setImgError(true)}
               />
             ) : (
               <div className="h-full w-full flex items-center justify-center text-sm font-bold text-white bg-gradient-to-br from-blue-500 to-indigo-600">

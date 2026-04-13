@@ -44,6 +44,12 @@ const syncUser = async (req, res) => {
         );
 
         if (userCheck.rows.length > 0) {
+            // If user logged in with Google, update their avatar URL
+            if (avatar_url) {
+                await db.query('UPDATE users SET avatar_url = $1 WHERE firebase_uid = $2', [avatar_url, firebase_uid]);
+                userCheck.rows[0].avatar_url = avatar_url;
+            }
+            
             return res.status(200).json({
                 message: 'User synced successfully',
                 user: userCheck.rows[0]

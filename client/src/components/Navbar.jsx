@@ -7,6 +7,7 @@ const Navbar = () => {
   const [user, setUser] = useState(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [imgError, setImgError] = useState(false);
   
   const auth = getAuth();
   const navigate = useNavigate();
@@ -103,11 +104,11 @@ const Navbar = () => {
                   <span className="hidden md:block text-sm font-semibold text-gray-700">
                     {user.displayName ? user.displayName.split(' ')[0] : 'Student'}
                   </span>
-                  <div className="h-9 w-9 rounded-full bg-gray-200 p-0.5 border-2 border-white shadow-md overflow-hidden hover:ring-2 hover:ring-blue-100 transition-all">
-                    {user.photoURL ? (
-                      <img src={user.photoURL} alt="Profile" className="h-full w-full object-cover rounded-full" />
+                  <div className="h-10 w-10 rounded-full bg-gray-200 p-0.5 border-2 border-white shadow-md overflow-hidden hover:ring-2 hover:ring-blue-100 transition-all">
+                    {user.photoURL && !imgError ? (
+                      <img src={user.photoURL} alt="Profile" className="h-full w-full object-cover rounded-full" onError={() => setImgError(true)} />
                     ) : (
-                      <div className="h-full w-full bg-gradient-to-tr from-blue-500 to-indigo-500 flex items-center justify-center text-white font-bold text-xs">
+                      <div className="h-full w-full bg-gradient-to-tr from-blue-500 to-indigo-500 flex items-center justify-center text-white font-bold text-xs rounded-full">
                         {user.displayName ? user.displayName[0].toUpperCase() : 'U'}
                       </div>
                     )}
